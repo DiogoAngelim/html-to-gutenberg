@@ -1,0 +1,42 @@
+{
+  "dependencies": {
+    "axios": "^1.7.2",
+    "buffer": "^6.0.3",
+    "cheerio": "^1.0.0-rc.12",
+    "child_process": "^1.0.2",
+    "fetch-page-assets": "^1.1.2",
+    "fs": "^0.0.1-security",
+    "node-html-to-jsx": "^1.1.0",
+    "path": "^0.12.7",
+    "puppeteer": "^22.11.0"
+  },
+  "type": "module",
+  "name": "html-to-gutenberg",
+  "version": "1.0.0",
+  "description": "Convert HTML strings to Gutenberg blocks",
+  "main": "index.js",
+  "directories": {
+    "test": "test"
+  },
+  "scripts": {
+    "test": "jest"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/DiogoAngelim/html-to-gutenberg.git"
+  },
+  "keywords": [
+    "gutenberg",
+    "html",
+    "wordpress",
+    "wp",
+    "jsx",
+    "converter"
+  ],
+  "author": "Diogo Angelim",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/DiogoAngelim/html-to-gutenberg/issues"
+  },
+  "homepage": "https://github.com/DiogoAngelim/html-to-gutenberg#readme"
+}
