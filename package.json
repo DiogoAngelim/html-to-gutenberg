@@ -13,7 +13,7 @@
   "type": "module",
   "name": "html-to-gutenberg",
   "version": "1.0.0",
-  "description": "Convert HTML strings to Gutenberg blocks",
+  "description": "Convert HTML strings to editable Gutenberg blocks",
   "main": "index.js",
   "directories": {
     "test": "test"
