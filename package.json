@@ -13,7 +13,7 @@
   "type": "module",
   "types": "index.ts",
   "name": "html-to-gutenberg",
-  "version": "1.0.3",
+  "version": "1.0.4",
   "description": "Convert HTML strings to editable WP Gutenberg blocks.",
   "main": "index.js",
   "directories": {
