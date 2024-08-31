@@ -1,11 +1,16 @@
 {
   "compilerOptions": {
-    "moduleResolution": "Bundler",
+    "sourceMap": true,
+    "outDir": "dist",
     "target": "esnext",
-    "lib": ["esnext", "dom"],
-    "paths": {
-      "*": ["./node_modules/*"],
-      "cheerio": ["./node_modules/cheerio/lib/index.d.ts"]
-    }
-  },
+    "module": "CommonJS",
+    "strict": true,
+    "lib": [
+      "esnext"
+    ],
+    "esModuleInterop": true,
+    "cheerio": [
+      "./node_modules/cheerio/lib/index.d.ts"
+    ]
+  }
 }

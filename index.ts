@@ -3,24 +3,20 @@ import * as cheerio from 'cheerio';
 import convert from 'node-html-to-jsx';
 import fs from 'fs';
 import path from 'path';
-import puppeteer from 'puppeteer';
-import { spawnSync } from 'child_process';
-import { Buffer } from 'buffer';
 import extractAssets from 'fetch-page-assets';
+import icon from 'html-screenshots';
+import imageToBase64 from 'image-to-base64';
 
-import { 
-  imports, 
-  panels, 
-  images, 
-  browserOptions, 
-  userAgent, 
-  pageOptions, 
+import {
+  imports,
+  panels,
+  images,
   characters,
   webpackConfig,
   packageJson,
   babelrc,
-  editorStyles,
- } from './globals.js';
+  editorStyles
+} from './globals.js';
 
 interface Attributes {
   [key: string]: {
@@ -34,10 +30,10 @@ interface Attributes {
 interface Panel {
   type?: string,
   title?: string,
-  attributes?: string[],
+  attributes?: any,
 };
 
-interface Image { 
+interface Image {
   randomUrlVariable: string,
   randomAltVariable: string,
   imgClass: string,
@@ -53,50 +49,33 @@ interface ImageProperties {
   attribute?: string,
   prefix?: string,
 }
-
-interface HtmlValidation {
-  hasHTMLTags: boolean,
-  hasHeadTags: boolean, 
-  hasBodyTags: boolean,
-}
-
 interface BlockOptions {
   name: string,
   prefix: string,
   category: string,
-  icon?: string,
-  basePath?: string,
-  cssFiles?: string[],
-  jsFiles?: string[],
-  generateIcon?: boolean,
-  chromePath?: string,
+  basePath: string,
   htmlContent?: string,
-}
-
-interface ImageSettings {
-  name: string,
-  htmlContent: string, 
-  basePath?: string, 
+  generateIconPreview?: boolean,
   cssFiles?: string[],
   jsFiles?: string[],
 }
 
-const block = async (htmlContent: string, options: BlockOptions): Promise<string> => {
+const block = async (htmlContent: string, options: BlockOptions = { name: 'My block', prefix: 'uai', category: 'common', basePath: process.cwd() }): Promise<string> => {
   const attributes: Attributes = {};
 
   const convertName = (name: string): string => {
-    return name.replace(new RegExp(/\W|\s/, 'g'), '_').toLowerCase();
+    return name.replace(new RegExp(/\W|_/, 'g'), '-').toLowerCase();
   }
 
-  const saveFile = (fileName: string, contents: string, options: BlockOptions): string => {  
+  const saveFile = (fileName: string, contents: string, options: BlockOptions): any => {
     try {
       const filePath = path.join(options.basePath, fileName);
-    
+
       fs.writeFileSync(filePath, contents);
 
       return contents;
 
-    } catch (error) {
+    } catch (error: any) {
       logError(error);
     }
   }
@@ -109,17 +88,24 @@ const block = async (htmlContent: string, options: BlockOptions): Promise<string
         const { data } = await axios.get(file, { responseType: 'text' });
 
         output += data;
-      } catch (error) {
+      } catch (error: any) {
         logError(error);
-      } 
+      }
     }
 
     return output;
   }
 
+  const convertToUnderscores = (string: string): string => {
+    return `${string.replaceAll('-', '_')}${generateRandomVariableName('func', 3)}`;
+  }
+
   const getPhp = (options: BlockOptions): string => {
     const { name, prefix } = options;
     const newName = convertName(name);
+
+    const phpName = convertToUnderscores(name);
+    const phpPrefix = convertToUnderscores(prefix);
 
     return `
     <?php
@@ -134,29 +120,35 @@ const block = async (htmlContent: string, options: BlockOptions): Promise<string
       exit;
     }
 
-    add_action( 'enqueue_block_editor_assets', '${prefix}_${newName}_editor_assets' );
+    add_action( 'enqueue_block_editor_assets', '${phpPrefix}_${phpName}_editor_assets' );
 
-    function ${prefix}_${newName}_editor_assets() {
+      function ${phpPrefix}_${phpName}_editor_assets() {
+      $filepath = plugin_dir_path(__FILE__) . 'block.build.js';
+      $version = file_exists($filepath) ? filemtime($filepath) : time();
+
       wp_enqueue_script(
         '${prefix}-${newName}',
         plugins_url( 'block.build.js', __FILE__ ),
         array( 'wp-blocks', 'wp-components', 'wp-element' ,'wp-editor'),
-        filemtime( plugin_dir_path( __FILE__ ) . 'block.build.js' )
+        $version
       );
 
       wp_localize_script( '${prefix}-${newName}', 'vars', array( 'url' => plugin_dir_url( __FILE__ ) ) );
+
+      $filepath = plugin_dir_path(__FILE__) . 'editor.css';
+      $version = file_exists($filepath) ? filemtime($filepath) : time();
 
       wp_enqueue_style(
         '${prefix}-${newName}-editor',
         plugins_url( 'editor.css', __FILE__ ),
         array( 'wp-edit-blocks' ),
-        filemtime( plugin_dir_path( __FILE__ ) . 'editor.css' )
+        $version
       );
     }
 
-    add_action( 'enqueue_block_assets', '${prefix}_${newName}_block_assets' );
+    add_action( 'enqueue_block_assets', '${phpPrefix}_${phpName}_block_assets' );
 
-    function ${prefix}_${newName}_block_assets() {
+    function ${phpPrefix}_${phpName}_block_assets() {
       $args = array(
         'handle' => '${prefix}-${newName}-frontend',
         'src'    => plugins_url( 'style.css', __FILE__ ),
@@ -167,11 +159,14 @@ const block = async (htmlContent: string, options: BlockOptions): Promise<string
         $args
       );
 
+      $filepath = plugin_dir_path(__FILE__) . 'script.js';
+      $version = file_exists($filepath) ? filemtime($filepath) : time();
+
       wp_enqueue_script(
         '${prefix}-${newName}-js',
         plugins_url( 'scripts.js', __FILE__ ),
         array(),
-        filemtime( plugin_dir_path( __FILE__ ) . 'scripts.js' )
+        $version
       );
 
       wp_localize_script( '${prefix}-${newName}-js', 'vars', array( 'url' => plugin_dir_url( __FILE__ ) ) );
@@ -189,18 +184,20 @@ const block = async (htmlContent: string, options: BlockOptions): Promise<string
   }
 
   const saveFiles = async (options: BlockOptions): Promise<string> => {
-    const { cssFiles, jsFiles } = options;
+    const { cssFiles = [] } = options;
+
     const css = await parseRequirements(cssFiles);
 
     saveFile('style.css', css, options);
     saveFile('editor.css', setEditor(css), options);
-    saveFile('scripts.js', await parseRequirements(jsFiles), options);
+
+    saveFile('scripts.js', '', options);
     saveFile('package.json', packageJson, options);
     saveFile('webpack.config.js', webpackConfig, options);
     saveFile('.babelrc', babelrc, options);
     saveFile('index.php', getPhp(options), options);
 
-    return saveFile('block.js', await getBlock(options), options);
+    return saveFile('block.js', (await getBlock(htmlContent, options)), options);
   }
 
   const logError = (error: Error): void => {
@@ -267,17 +264,19 @@ const block = async (htmlContent: string, options: BlockOptions): Promise<string
 
   const loadHtml = async (options: BlockOptions): Promise<any> => {
     const { basePath, htmlContent } = options;
-    
-    const newHtml = await extractAssets(htmlContent, { 
-      basePath, 
-      saveFile: false,
-      verbose: false,
-    });
-    
-    return cheerio.load(newHtml, {
-      xml: true,
-      decodeEntities: false,
-    });
+
+    if (htmlContent) {
+      const newHtml = await extractAssets(htmlContent, {
+        basePath,
+        saveFile: false,
+        verbose: false,
+      });
+
+      return cheerio.load(newHtml, {
+        xml: true,
+        decodeEntities: false,
+      });
+    }
   }
 
   const getImageSource = (imgTag: any): string => {
@@ -320,25 +319,26 @@ const block = async (htmlContent: string, options: BlockOptions): Promise<string
     const previousClass = getParentClass(parentElement);
     const isBackground = isBackgroundImage(imgStyle, imgClass, previousStyle, previousClass);
 
-    return { 
-      imgTag, 
-      imgClass, 
+    return {
+      imgTag,
+      imgClass,
       isBackground,
-      imgSrc: getImageSource(imgTag), 
-      imgAlt: getImageAlt(imgTag), 
+      imgSrc: getImageSource(imgTag),
+      imgAlt: getImageAlt(imgTag),
     };
   }
 
   const setImageAttribute = (properties: ImageProperties): string => {
     const { imgTag, imgSrc, imgAlt, attribute, type, prefix } = properties;
+    const newPrefix = prefix ? convertName(prefix) : 'wp';
 
-    const randomVariable = generateRandomVariableName(`${type}${prefix}`);
+    const randomVariable = generateRandomVariableName(`${type}${newPrefix}`);
 
     attributes[randomVariable] = {
       attribute,
       type: 'string',
       selector: 'img',
-      default: attribute === 'alt' ? imgAlt : `var.url+'${imgSrc}'`, 
+      default: attribute === 'alt' ? imgAlt : `var.url+'${imgSrc}'`,
     };
 
     imgTag.attr(attribute, `{attributes.${randomVariable}}`);
@@ -349,14 +349,14 @@ const block = async (htmlContent: string, options: BlockOptions): Promise<string
   const processImage = (properties: ImageProperties): void => {
     const { imgClass, type } = properties;
 
-    const randomUrlVariable = setImageAttribute({...properties, attribute: 'src', prefix: 'Url' });
-    const randomAltVariable = setImageAttribute({...properties, attribute: 'alt', prefix: 'Alt' });
-    
+    const randomUrlVariable = setImageAttribute({ ...properties, attribute: 'src', prefix: 'Url' });
+    const randomAltVariable = setImageAttribute({ ...properties, attribute: 'alt', prefix: 'Alt' });
+
     if (type !== 'background') {
       images.push({ randomUrlVariable, randomAltVariable, imgClass });
 
       return;
-    } 
+    }
 
     createPanel({
       type: 'media',
@@ -366,19 +366,19 @@ const block = async (htmlContent: string, options: BlockOptions): Promise<string
   }
 
   const getFixedHtml = (html: string): string => {
-    return html.replace(/ onChange="{" \(newtext\)=""\>/gi, ' onChange={ (newtext) => ').replace(/\<\/RichText\>/gi, '').replace(/value="{(.*?)}"/gi, 'value={$1}');
+    return html.replace(/ onChange="{" \(newtext\)=""\>/gi, ' onChange={ (newtext) => ').replace(/\<\/RichText\>/gi, '').replace(/value="{(.*?)}"/gi, 'value={$1}').replace(/"{attributes.(.*?)}"/gi, '{attributes.$1}');
   }
 
   const processImages = (imgTag: any): void => {
     const properties = getImageProperties(imgTag);
     const { isBackground } = properties;
 
-      if (!isBackground) {
-        processImage({...properties, type: 'image' });
-        return;
-      } 
+    if (!isBackground) {
+      processImage({ ...properties, type: 'image' });
+      return;
+    }
 
-      processImage({...properties, type: 'background' });
+    processImage({ ...properties, type: 'background' });
   }
 
   const loopImages = ($: any): void => {
@@ -430,11 +430,21 @@ const block = async (htmlContent: string, options: BlockOptions): Promise<string
   }
 
   const editJsxContent = async (options: BlockOptions): Promise<string> => {
-    return await processEditImages({ ...options, htmlContent: convert(parseContent(options.htmlContent)) });
+    let content;
+
+    if (options.htmlContent) {
+      content = options.htmlContent.replaceAll(/<!--(.*?)-->/sg, '');
+    }
+
+    content = `<div>${content}</div>`;
+
+    return await processEditImages({ ...options, htmlContent: convert(parseContent(content)) });
   }
 
   const createPanel = (values: Panel): void => {
-    panels.push(values);
+    if (values.attributes && values.attributes.length > 0) {
+      panels.push(values);
+    }
   }
 
   const getSvgTemplate = (_match: string, group1: string, group3: string, randomSVGVariable: string): string => {
@@ -447,74 +457,77 @@ const block = async (htmlContent: string, options: BlockOptions): Promise<string
       `;
   }
 
-  const getSvg = (match: string, group1: string, group2: string, group3: string): string => {
-    const randomSVGVariable = generateRandomVariableName('svg');
+  const replaceSVGImages = (html: string): string => {
+    return html.replace(/<\s*svg\b((?:[^>'"]|"[^"]*"|'[^']*')*)>(\s*(?:[^<]|<(?!\/svg\s*>))*)(<\/\s*svg\s*>)/gim, (match: string, group1: string, group2: string, group3: string): string => {
+      const content = group2.trim();
 
-    setAttributeContent(randomSVGVariable, group2);
+      if (content) {
+        const randomSVGVariable = generateRandomVariableName('svg');
 
-    createPanel({ 
-      type: 'svg',
-      title: 'SVG Markup',
-      attributes: [randomSVGVariable] 
+        setAttributeContent(randomSVGVariable, content);
+
+        createPanel({
+          type: 'svg',
+          title: 'SVG Markup',
+          attributes: [randomSVGVariable]
+        })
+
+        return getSvgTemplate(match, group1, group3, randomSVGVariable);
+      }
+
+      return match;
     });
-
-    return getSvgTemplate(match, group1, group3, randomSVGVariable);
-  }
-
-  const replaceSVGImages = (html: string): string =>  {
-    return html.replace(/<\s*svg\b((?:[^>'"]|"[^"]*"|'[^']*')*)>(\s*(?:[^<]|<(?!\/svg\s*>))*)(<\/\s*svg\s*>)/gm, getSvg);
   }
 
   const getSvgPanelTemplate = (panel: Panel): string => {
-    const { attributes, title } = panel;
+    return panel.attributes && attributes[panel.attributes] ? `
+    { (            
+    <PanelBody title="${panel.title}">
+      <PanelRow>
+        <div>
+          <TextareaControl
+            label="SVG Content"
+            help="Enter your SVG content..."
+            value={ attributes.${panel.attributes} }
+            onChange={ ( value ) => {
+              setAttributes({ ${panel.attributes}: value });
+            } }
+          />
+        </div>
+      </PanelRow>
+    </PanelBody>
+    )}
+  ` : '';
 
-    return `
-      { (            
-      <PanelBody title="${title}">
-        <PanelRow>
-          <div>
-            <TextareaControl
-              label="SVG Content"
-              help="Enter your SVG content..."
-              value={ attributes.${attributes[0]} }
-              onChange={ ( value ) => {
-                setAttributes({ ${attributes[0]}: value });
-              } }
-            />
-          </div>
-        </PanelRow>
-      </PanelBody>
-      )}
-    `;
   }
 
   const getMediaPanelTemplate = (panel: Panel): string => {
-    const { title, attributes } = panel;
+    const mediaAtts = panel.attributes?.[0] && panel.attributes[1] ? `${panel.attributes[0]}: media.url,
+                   ${panel.attributes[1]}: media.alt` : '';
 
-    return `              
-      <PanelBody title="${title}">
+    return panel.attributes && panel.attributes[0] && attributes[panel.attributes[0]] ? `              
+      <PanelBody title="${panel.title}">
         <PanelRow>
           <div>
             <MediaUpload
               onSelect={ (media) => { 
                 setAttributes({ 
-                  ${attributes[0]}: media.url,
-                  ${attributes[1]}: media.alt
+                  ${mediaAtts}
                 }); 
               } }
               type="image"
-              value={ attributes.${attributes?.[0]} }
+              value={ attributes.${panel.attributes?.[0]} }
               render={({ open }) => (
                   <button onClick={ open }>Select Image</button>
               )}
             />
-            {attributes.${attributes?.[0]} && (
-                <img src={attributes.${attributes?.[0]}} alt={attributes.${attributes?.[1]}} />
+            {attributes.${panel.attributes?.[0]} && (
+                <img src={attributes.${panel.attributes?.[0]}} alt={attributes.${panel.attributes?.[1]}} />
             )}
           </div>
         </PanelRow>
       </PanelBody>
-      `;
+      ` : '';
   }
 
   const getPanelTemplate = (panel: Panel): string => {
@@ -529,7 +542,9 @@ const block = async (htmlContent: string, options: BlockOptions): Promise<string
   }
 
   const getPanelsTemplate = (): string => {
-    return panels.map((_panel: Panel) => getPanelTemplate).join('\n');
+    return panels.map((panel: Panel) => {
+      return getPanelTemplate(panel);
+    }).join('\n');
   }
 
   const createPanels = (): string => {
@@ -556,9 +571,11 @@ const block = async (htmlContent: string, options: BlockOptions): Promise<string
   }
 
   const processLinks = (options: BlockOptions): BlockOptions => {
+    const htmlContent = options.htmlContent ? options.htmlContent.replace(/(<a)[^>]*>([\s\S]*?)(<\/a>)/gim, replaceRichText) : undefined;
+
     return {
       ...options,
-      htmlContent: options.htmlContent.replace(/(<a)[^>]*>([\s\S]*?)(<\/a>)/gim, replaceRichText),
+      htmlContent,
     }
   }
 
@@ -575,274 +592,96 @@ const block = async (htmlContent: string, options: BlockOptions): Promise<string
   }
 
   const getEdit = async (options: BlockOptions): Promise<string> => {
-    return replaceSVGImages(await editJsxContent(processLinks(options)));
+    let { htmlContent } = options
+
+    if (htmlContent) {
+      htmlContent = await editJsxContent(processLinks(options))
+      return replaceSVGImages(htmlContent);
+    }
+
+    return '';
   }
 
   const getSave = (edit: string): string => {
     return processSaveImages(saveHtmlContent(edit));
   }
 
-  const getBlock = async (settings: BlockOptions): Promise<string> => {
-    const { prefix, name, category, icon } = settings;
+  const getBlock = async (htmlContent: string, settings: BlockOptions): Promise<string> => {
+    const { prefix, name, category, generateIconPreview, basePath } = settings;
     const newName = convertName(name);
+    const newPrefix = convertName(prefix);
 
-    const edit = await getEdit(settings);
+    let iconPreview = '\'shield\'';
+    let edit = await getEdit(settings);
+    edit = edit.replace(/dangerouslySetInnerHTML="{" {="" __html:="" (.*?)="" }}=""/gm, `dangerouslySetInnerHTML={{ __html: $1 }}`);
     const save = getSave(edit);
-    const panels = createPanels();
-    const attributes = `${JSON.parse(JSON.stringify(getComponentAttributes(), null, 2)).replace(/"var.url\+\'(.*?)\'(.*?)"/g, 'vars.url+\'$1\'$2')}`;
+    const blockPanels = createPanels();
+    const blockAttributes = `${JSON.parse(JSON.stringify(getComponentAttributes(), null, 2)).replace(/"var.url\+\'(.*?)\'(.*?)"/g, 'vars.url+\'$1\'$2')}`;
 
-    return `
-      ${imports}
+    if (generateIconPreview) {
+      try {
+        await icon(htmlContent, settings)
+        iconPreview = `(<img src="data:image/jpeg;base64,${await imageToBase64(path.join(basePath, 'preview.jpeg'))}" />)`;
+      } catch (error: any) {
+        console.log(`There was an error generating preview. ${error.message}`);
+      }
+    }
+    const output = `
+        ${imports}
 
-      registerBlockType('${prefix}/${newName}', {
-        title: '${newName}',
-        icon: ${icon},
-        category: '${category}',
-        attributes: ${attributes},
-        edit(props) {
-          const { attributes, setAttributes } = props;
+        registerBlockType('${newPrefix}/${newName}', {
+            title: '${newName}',
+            icon: ${iconPreview},
+            category: '${category}',
+            attributes: ${blockAttributes},
+            edit(props) {
+            const { attributes, setAttributes } = props;
 
-          return (
-              <div>
-                <InspectorControls>
-                ${panels}
-                </InspectorControls>
+            return (
+                <div>
+                    <InspectorControls>
+                    ${blockPanels}
+                    </InspectorControls>
 
-                ${edit}
-              </div>
+                    ${edit}
+                </div>
+                );
+            },
+            save(props) {
+            const { attributes } = props;
+
+            return (
+                ${save}
             );
-          },
-        save(props) {
-          const { attributes } = props;
+            },
+        });
+        `;
 
-          return (
-            ${save}
-          );
-        },
-    });
-    `;
+    if (generateIconPreview) {
+      return output.replace(/icon: \s * (')([^']*)(')/, 'icon: $2');
+    }
+
+    return output;
   }
 
-  const setupVariables = async (htmlContent: string, options: BlockOptions): Promise<BlockOptions> => {
-    let { basePath, cssFiles, jsFiles, icon, generateIcon, chromePath, name } = options;
-
-    basePath = basePath || process.cwd();
-    cssFiles = cssFiles || [];
-    jsFiles = jsFiles || [];
-    icon = icon || 'shield';
-    generateIcon = typeof generateIcon === 'boolean' ? generateIcon : false;
-
-    if (generateIcon && !chromePath) {
-      throw new Error('A path to a chrome executable must be provided.');
-    }
+  const setupVariables = async (htmlContent: string, options: BlockOptions): Promise<any> => {
+    let { basePath = process.cwd(), cssFiles = [], jsFiles = [], name = 'My block' } = options;
 
     const newDir = path.join(basePath, convertName(name));
 
     try {
       fs.mkdirSync(newDir, { recursive: true });
 
-      return { 
-        ...options, 
-        jsFiles, 
-        cssFiles, 
-        htmlContent, 
-        basePath: newDir,
-        icon: generateIcon && chromePath ? await generateImagePreview({ ...options, htmlContent, cssFiles, jsFiles, basePath: newDir }) : icon, 
+      return {
+        ...options,
+        jsFiles,
+        cssFiles,
+        htmlContent,
+        basePath: newDir
       }
-    } catch (error) {
+    } catch (error: any) {
       logError(error);
     }
-  }
-
-  const testHtmlContent = (htmlContent: string): HtmlValidation => {
-    return { 
-      hasHTMLTags: /<html[^>]*>/i.test(htmlContent), 
-      hasHeadTags: /<head[^>]*>/i.test(htmlContent),
-      hasBodyTags: /<body[^>]*>/i.test(htmlContent),
-    };
-  }
-
-  const getNewFiles = (files: string[], existingFiles: Set<any>): string[] => {
-    return files.filter((file) => !existingFiles.has(file));
-  }
-
-  const formJsTag = (file: string): string => {
-    return `<script src="${file}"></script>`;
-  }
-
-  const formCssTag = (file: string): string => {
-    return `<link rel="stylesheet" href="${file}">`;
-  }
-
-  const mapNewFilesAs = (files: string[], type: string): string => {
-    return files.map((file) => type === 'javascript' ? formJsTag(file) : formCssTag(file)).join('\n');
-  }
-
-  const getNewCssFiles = (imageSettings: ImageSettings): string[] => {
-    const { htmlContent, cssFiles } = imageSettings;
-
-    return getNewFiles(cssFiles, new Set(htmlContent.match(/<link[^>]*href="([^"]+)"/gi) || []));
-  }
-
-  const parseCssFiles = (imageSettings: ImageSettings): string => {  
-    return mapNewFilesAs(getNewCssFiles(imageSettings), 'css');
-  }
-
-  const getNewJsFiles = (imageSettings: ImageSettings): string[] => {
-    const { htmlContent, jsFiles } = imageSettings;
-
-    const existingJSFiles = new Set(htmlContent.match(/<script[^>]*src="([^"]+)"/gi) || []);
-
-    return getNewFiles(jsFiles, existingJSFiles);
-  }
-
-  const parseJsFiles = (imageSettings: ImageSettings): string => {
-    return mapNewFilesAs(getNewJsFiles(imageSettings), 'javascript');
-  }
-
-  const parseFiles = (imageSettings: ImageSettings): { js: string, css: string } => {
-    return { 
-      js: parseJsFiles(imageSettings),
-      css: parseCssFiles(imageSettings), 
-    };
-  }
-
-  const formHtmlPage = (imageSettings: ImageSettings): string => {
-    const { htmlContent } = imageSettings;
-    const { hasHTMLTags, hasHeadTags, hasBodyTags } = testHtmlContent(htmlContent);
-    const { js, css } = parseFiles(imageSettings);
-
-    let htmlPage = '';
-
-    if (!hasHTMLTags) {
-      htmlPage += `<!DOCTYPE html><html lang="en">`;
-    }
-
-    if (!hasHeadTags) {
-      htmlPage += `<head>${css}${js}</head>`;
-    }
-
-    if (!hasBodyTags) {
-      htmlPage += `<body>`;
-    }
-
-    htmlPage += htmlContent;
-
-    if (hasHeadTags) {
-      htmlPage += `${css}${js}`;
-    }
-
-    if (!hasBodyTags) {
-      htmlPage += `</body>`;
-    }
-
-    if (!hasHTMLTags) {
-      htmlPage += `</html>`;
-    }
-
-    return htmlPage;
-  }
-
-  const configurePage = async (page: any): Promise<void> => {
-    await page.setViewport({ height: 300, width: 1440 });
-    await page.setUserAgent(userAgent);
-  }
-
-  const openPage = async (page: any, htmlContent: string): Promise<void> => {
-    await page.goto(`data:text/html,${encodeURIComponent(htmlContent)}`, pageOptions);
-  }
-
-  const getScreenshot = async (page: any): Promise<Buffer> => {
-    return await page.screenshot({
-      quality: 70,
-      type: 'jpeg',
-      clip: await getElementDimensions(page),
-    });
-  }
-
-  const getBufferFromPage = async (browser: any, htmlContent: string): Promise<Buffer> => {
-    const page = await browser.newPage();
-
-    await configurePage(page);
-    await openPage(page, htmlContent);
-
-    return await getScreenshot(page);
-  }
-
-  const bufferToString = (buffer: Buffer): string => {
-    return Buffer.from(buffer).toString('base64');
-  }
-
-  const saveBuffer = (filePath: string, buffer: Buffer): string => {
-    fs.writeFileSync(filePath, buffer);
-
-    return bufferToString(buffer);
-  }
-
-  const getImageBuffer = async (browser: any, filePath: string, htmlContent: string): Promise<string> => {  
-    await browser.close();
-
-    return saveBuffer(filePath, await getBufferFromPage(browser, htmlContent));
-  }
-
-  const getElementDimensions = async (page: any) => {
-    return page.evaluate(async (innerSelector: any) => {
-      const elem = document.querySelector(innerSelector);
-
-      if (!elem) {
-        throw new Error("element not found");
-      }
-
-      elem.scrollIntoViewIfNeeded();
-      const boundingBox = elem.getBoundingClientRect();
-
-      return {
-        x: Math.round(boundingBox.x),
-        y: Math.round(boundingBox.y),
-        width: Math.round(boundingBox.width),
-        height: Math.round(boundingBox.height),
-      };
-    }, 'body');
-  };
-
-  const connect = async (browserWSEndpoint: string): Promise<any> => {
-    return await puppeteer.connect({ browserWSEndpoint });
-  }
-
-  const saveImage = async (imageSettings: ImageSettings): Promise<string> => {
-
-    const browserWSEndpoint = await launchBrowser();
-    const filePath = path.join(imageSettings.basePath, 'preview.jpeg');
-    const htmlContent = formHtmlPage(imageSettings);
-    const browser = await connect(browserWSEndpoint);
-    
-    return await getImageBuffer(browser, filePath, htmlContent);
-  }
-
-  const launchBrowser = async (): Promise<string> => {
-    const browser = await puppeteer.launch();
-
-    return browser.wsEndpoint();
-  }
-
-  const getIcon = async (imageOptions: ImageSettings): Promise<string> => {
-    return `(<img src="data:image/jpeg;base64,${await saveImage(imageOptions)}" />)`;
-  }
-
-  const generateImagePreview = async (blockOptions: any): Promise<string> => {
-    let { chromePath, generateIcon, icon } = blockOptions;
-    
-    if (generateIcon && chromePath) {
-      try {
-        spawnSync(chromePath, browserOptions);
-        
-        return getIcon(blockOptions);
-      } catch (error) {
-        logError(error);
-      }
-    }
-
-    return icon;
   }
 
   return saveFiles(await setupVariables(htmlContent, options));

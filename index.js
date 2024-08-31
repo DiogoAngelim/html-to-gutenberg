@@ -3,16 +3,15 @@ import * as cheerio from 'cheerio';
 import convert from 'node-html-to-jsx';
 import fs from 'fs';
 import path from 'path';
-import puppeteer from 'puppeteer';
-import { spawnSync } from 'child_process';
-import { Buffer } from 'buffer';
 import extractAssets from 'fetch-page-assets';
-import { imports, panels, images, browserOptions, userAgent, pageOptions, characters, webpackConfig, packageJson, babelrc, editorStyles, } from './globals.js';
+import icon from 'html-screenshots';
+import imageToBase64 from 'image-to-base64';
+import { imports, panels, images, characters, webpackConfig, packageJson, babelrc, editorStyles } from './globals.js';
 ;
-const block = async (htmlContent, options) => {
+const block = async (htmlContent, options = { name: 'My block', prefix: 'uai', category: 'common', basePath: process.cwd() }) => {
     const attributes = {};
     const convertName = (name) => {
-        return name.replace(new RegExp(/\W|\s/, 'g'), '_').toLowerCase();
+        return name.replace(new RegExp(/\W|_/, 'g'), '-').toLowerCase();
     };
     const saveFile = (fileName, contents, options) => {
         try {
@@ -37,9 +36,14 @@ const block = async (htmlContent, options) => {
         }
         return output;
     };
+    const convertToUnderscores = (string) => {
+        return `${string.replaceAll('-', '_')}${generateRandomVariableName('func', 3)}`;
+    };
     const getPhp = (options) => {
         const { name, prefix } = options;
         const newName = convertName(name);
+        const phpName = convertToUnderscores(name);
+        const phpPrefix = convertToUnderscores(prefix);
         return `
     <?php
     /*
@@ -53,29 +57,35 @@ const block = async (htmlContent, options) => {
       exit;
     }
 
-    add_action( 'enqueue_block_editor_assets', '${prefix}_${newName}_editor_assets' );
+    add_action( 'enqueue_block_editor_assets', '${phpPrefix}_${phpName}_editor_assets' );
 
-    function ${prefix}_${newName}_editor_assets() {
+      function ${phpPrefix}_${phpName}_editor_assets() {
+      $filepath = plugin_dir_path(__FILE__) . 'block.build.js';
+      $version = file_exists($filepath) ? filemtime($filepath) : time();
+
       wp_enqueue_script(
         '${prefix}-${newName}',
         plugins_url( 'block.build.js', __FILE__ ),
         array( 'wp-blocks', 'wp-components', 'wp-element' ,'wp-editor'),
-        filemtime( plugin_dir_path( __FILE__ ) . 'block.build.js' )
+        $version
       );
 
       wp_localize_script( '${prefix}-${newName}', 'vars', array( 'url' => plugin_dir_url( __FILE__ ) ) );
+
+      $filepath = plugin_dir_path(__FILE__) . 'editor.css';
+      $version = file_exists($filepath) ? filemtime($filepath) : time();
 
       wp_enqueue_style(
         '${prefix}-${newName}-editor',
         plugins_url( 'editor.css', __FILE__ ),
         array( 'wp-edit-blocks' ),
-        filemtime( plugin_dir_path( __FILE__ ) . 'editor.css' )
+        $version
       );
     }
 
-    add_action( 'enqueue_block_assets', '${prefix}_${newName}_block_assets' );
+    add_action( 'enqueue_block_assets', '${phpPrefix}_${phpName}_block_assets' );
 
-    function ${prefix}_${newName}_block_assets() {
+    function ${phpPrefix}_${phpName}_block_assets() {
       $args = array(
         'handle' => '${prefix}-${newName}-frontend',
         'src'    => plugins_url( 'style.css', __FILE__ ),
@@ -86,11 +96,14 @@ const block = async (htmlContent, options) => {
         $args
       );
 
+      $filepath = plugin_dir_path(__FILE__) . 'script.js';
+      $version = file_exists($filepath) ? filemtime($filepath) : time();
+
       wp_enqueue_script(
         '${prefix}-${newName}-js',
         plugins_url( 'scripts.js', __FILE__ ),
         array(),
-        filemtime( plugin_dir_path( __FILE__ ) . 'scripts.js' )
+        $version
       );
 
       wp_localize_script( '${prefix}-${newName}-js', 'vars', array( 'url' => plugin_dir_url( __FILE__ ) ) );
@@ -106,16 +119,16 @@ const block = async (htmlContent, options) => {
     `;
     };
     const saveFiles = async (options) => {
-        const { cssFiles, jsFiles } = options;
+        const { cssFiles = [] } = options;
         const css = await parseRequirements(cssFiles);
         saveFile('style.css', css, options);
         saveFile('editor.css', setEditor(css), options);
-        saveFile('scripts.js', await parseRequirements(jsFiles), options);
+        saveFile('scripts.js', '', options);
         saveFile('package.json', packageJson, options);
         saveFile('webpack.config.js', webpackConfig, options);
         saveFile('.babelrc', babelrc, options);
         saveFile('index.php', getPhp(options), options);
-        return saveFile('block.js', await getBlock(options), options);
+        return saveFile('block.js', (await getBlock(htmlContent, options)), options);
     };
     const logError = (error) => {
         console.error(`[Error] ${error.message}`);
@@ -167,15 +180,17 @@ const block = async (htmlContent, options) => {
     };
     const loadHtml = async (options) => {
         const { basePath, htmlContent } = options;
-        const newHtml = await extractAssets(htmlContent, {
-            basePath,
-            saveFile: false,
-            verbose: false,
-        });
-        return cheerio.load(newHtml, {
-            xml: true,
-            decodeEntities: false,
-        });
+        if (htmlContent) {
+            const newHtml = await extractAssets(htmlContent, {
+                basePath,
+                saveFile: false,
+                verbose: false,
+            });
+            return cheerio.load(newHtml, {
+                xml: true,
+                decodeEntities: false,
+            });
+        }
     };
     const getImageSource = (imgTag) => {
         return imgTag.attr('src') || '';
@@ -218,7 +233,8 @@ const block = async (htmlContent, options) => {
     };
     const setImageAttribute = (properties) => {
         const { imgTag, imgSrc, imgAlt, attribute, type, prefix } = properties;
-        const randomVariable = generateRandomVariableName(`${type}${prefix}`);
+        const newPrefix = prefix ? convertName(prefix) : 'wp';
+        const randomVariable = generateRandomVariableName(`${type}${newPrefix}`);
         attributes[randomVariable] = {
             attribute,
             type: 'string',
@@ -243,7 +259,7 @@ const block = async (htmlContent, options) => {
         });
     };
     const getFixedHtml = (html) => {
-        return html.replace(/ onChange="{" \(newtext\)=""\>/gi, ' onChange={ (newtext) => ').replace(/\<\/RichText\>/gi, '').replace(/value="{(.*?)}"/gi, 'value={$1}');
+        return html.replace(/ onChange="{" \(newtext\)=""\>/gi, ' onChange={ (newtext) => ').replace(/\<\/RichText\>/gi, '').replace(/value="{(.*?)}"/gi, 'value={$1}').replace(/"{attributes.(.*?)}"/gi, '{attributes.$1}');
     };
     const processImages = (imgTag) => {
         const properties = getImageProperties(imgTag);
@@ -292,10 +308,17 @@ const block = async (htmlContent, options) => {
         });
     };
     const editJsxContent = async (options) => {
-        return await processEditImages({ ...options, htmlContent: convert(parseContent(options.htmlContent)) });
+        let content;
+        if (options.htmlContent) {
+            content = options.htmlContent.replaceAll(/<!--(.*?)-->/sg, '');
+        }
+        content = `<div>${content}</div>`;
+        return await processEditImages({ ...options, htmlContent: convert(parseContent(content)) });
     };
     const createPanel = (values) => {
-        panels.push(values);
+        if (values.attributes && values.attributes.length > 0) {
+            panels.push(values);
+        }
     };
     const getSvgTemplate = (_match, group1, group3, randomSVGVariable) => {
         return `
@@ -306,66 +329,68 @@ const block = async (htmlContent, options) => {
       ${group3}
       `;
     };
-    const getSvg = (match, group1, group2, group3) => {
-        const randomSVGVariable = generateRandomVariableName('svg');
-        setAttributeContent(randomSVGVariable, group2);
-        createPanel({
-            type: 'svg',
-            title: 'SVG Markup',
-            attributes: [randomSVGVariable]
-        });
-        return getSvgTemplate(match, group1, group3, randomSVGVariable);
-    };
     const replaceSVGImages = (html) => {
-        return html.replace(/<\s*svg\b((?:[^>'"]|"[^"]*"|'[^']*')*)>(\s*(?:[^<]|<(?!\/svg\s*>))*)(<\/\s*svg\s*>)/gm, getSvg);
+        return html.replace(/<\s*svg\b((?:[^>'"]|"[^"]*"|'[^']*')*)>(\s*(?:[^<]|<(?!\/svg\s*>))*)(<\/\s*svg\s*>)/gim, (match, group1, group2, group3) => {
+            const content = group2.trim();
+            if (content) {
+                const randomSVGVariable = generateRandomVariableName('svg');
+                setAttributeContent(randomSVGVariable, content);
+                createPanel({
+                    type: 'svg',
+                    title: 'SVG Markup',
+                    attributes: [randomSVGVariable]
+                });
+                return getSvgTemplate(match, group1, group3, randomSVGVariable);
+            }
+            return match;
+        });
     };
     const getSvgPanelTemplate = (panel) => {
-        const { attributes, title } = panel;
-        return `
-      { (            
-      <PanelBody title="${title}">
-        <PanelRow>
-          <div>
-            <TextareaControl
-              label="SVG Content"
-              help="Enter your SVG content..."
-              value={ attributes.${attributes[0]} }
-              onChange={ ( value ) => {
-                setAttributes({ ${attributes[0]}: value });
-              } }
-            />
-          </div>
-        </PanelRow>
-      </PanelBody>
-      )}
-    `;
+        return panel.attributes && attributes[panel.attributes] ? `
+    { (            
+    <PanelBody title="${panel.title}">
+      <PanelRow>
+        <div>
+          <TextareaControl
+            label="SVG Content"
+            help="Enter your SVG content..."
+            value={ attributes.${panel.attributes} }
+            onChange={ ( value ) => {
+              setAttributes({ ${panel.attributes}: value });
+            } }
+          />
+        </div>
+      </PanelRow>
+    </PanelBody>
+    )}
+  ` : '';
     };
     const getMediaPanelTemplate = (panel) => {
-        const { title, attributes } = panel;
-        return `              
-      <PanelBody title="${title}">
+        const mediaAtts = panel.attributes?.[0] && panel.attributes[1] ? `${panel.attributes[0]}: media.url,
+                   ${panel.attributes[1]}: media.alt` : '';
+        return panel.attributes && panel.attributes[0] && attributes[panel.attributes[0]] ? `              
+      <PanelBody title="${panel.title}">
         <PanelRow>
           <div>
             <MediaUpload
               onSelect={ (media) => { 
                 setAttributes({ 
-                  ${attributes[0]}: media.url,
-                  ${attributes[1]}: media.alt
+                  ${mediaAtts}
                 }); 
               } }
               type="image"
-              value={ attributes.${attributes?.[0]} }
+              value={ attributes.${panel.attributes?.[0]} }
               render={({ open }) => (
                   <button onClick={ open }>Select Image</button>
               )}
             />
-            {attributes.${attributes?.[0]} && (
-                <img src={attributes.${attributes?.[0]}} alt={attributes.${attributes?.[1]}} />
+            {attributes.${panel.attributes?.[0]} && (
+                <img src={attributes.${panel.attributes?.[0]}} alt={attributes.${panel.attributes?.[1]}} />
             )}
           </div>
         </PanelRow>
       </PanelBody>
-      `;
+      ` : '';
     };
     const getPanelTemplate = (panel) => {
         switch (panel.type) {
@@ -378,7 +403,9 @@ const block = async (htmlContent, options) => {
         }
     };
     const getPanelsTemplate = () => {
-        return panels.map((_panel) => getPanelTemplate).join('\n');
+        return panels.map((panel) => {
+            return getPanelTemplate(panel);
+        }).join('\n');
     };
     const createPanels = () => {
         return `
@@ -399,9 +426,10 @@ const block = async (htmlContent, options) => {
         return removeHref(match).replace(group1, '<span').replace(group3, '</span>');
     };
     const processLinks = (options) => {
+        const htmlContent = options.htmlContent ? options.htmlContent.replace(/(<a)[^>]*>([\s\S]*?)(<\/a>)/gim, replaceRichText) : undefined;
         return {
             ...options,
-            htmlContent: options.htmlContent.replace(/(<a)[^>]*>([\s\S]*?)(<\/a>)/gim, replaceRichText),
+            htmlContent,
         };
     };
     const transformOnClickEvent = (img) => {
@@ -414,59 +442,72 @@ const block = async (htmlContent, options) => {
         return JSON.stringify(attributes, null, 2);
     };
     const getEdit = async (options) => {
-        return replaceSVGImages(await editJsxContent(processLinks(options)));
+        let { htmlContent } = options;
+        if (htmlContent) {
+            htmlContent = await editJsxContent(processLinks(options));
+            return replaceSVGImages(htmlContent);
+        }
+        return '';
     };
     const getSave = (edit) => {
         return processSaveImages(saveHtmlContent(edit));
     };
-    const getBlock = async (settings) => {
-        const { prefix, name, category, icon } = settings;
+    const getBlock = async (htmlContent, settings) => {
+        const { prefix, name, category, generateIconPreview, basePath } = settings;
         const newName = convertName(name);
-        const edit = await getEdit(settings);
+        const newPrefix = convertName(prefix);
+        let iconPreview = '\'shield\'';
+        let edit = await getEdit(settings);
+        edit = edit.replace(/dangerouslySetInnerHTML="{" {="" __html:="" (.*?)="" }}=""/gm, `dangerouslySetInnerHTML={{ __html: $1 }}`);
         const save = getSave(edit);
-        const panels = createPanels();
-        const attributes = `${JSON.parse(JSON.stringify(getComponentAttributes(), null, 2)).replace(/"var.url\+\'(.*?)\'(.*?)"/g, 'vars.url+\'$1\'$2')}`;
-        return `
-      ${imports}
+        const blockPanels = createPanels();
+        const blockAttributes = `${JSON.parse(JSON.stringify(getComponentAttributes(), null, 2)).replace(/"var.url\+\'(.*?)\'(.*?)"/g, 'vars.url+\'$1\'$2')}`;
+        if (generateIconPreview) {
+            try {
+                await icon(htmlContent, settings);
+                iconPreview = `(<img src="data:image/jpeg;base64,${await imageToBase64(path.join(basePath, 'preview.jpeg'))}" />)`;
+            }
+            catch (error) {
+                console.log(`There was an error generating preview. ${error.message}`);
+            }
+        }
+        const output = `
+        ${imports}
 
-      registerBlockType('${prefix}/${newName}', {
-        title: '${newName}',
-        icon: ${icon},
-        category: '${category}',
-        attributes: ${attributes},
-        edit(props) {
-          const { attributes, setAttributes } = props;
+        registerBlockType('${newPrefix}/${newName}', {
+            title: '${newName}',
+            icon: ${iconPreview},
+            category: '${category}',
+            attributes: ${blockAttributes},
+            edit(props) {
+            const { attributes, setAttributes } = props;
 
-          return (
-              <div>
-                <InspectorControls>
-                ${panels}
-                </InspectorControls>
+            return (
+                <div>
+                    <InspectorControls>
+                    ${blockPanels}
+                    </InspectorControls>
 
-                ${edit}
-              </div>
+                    ${edit}
+                </div>
+                );
+            },
+            save(props) {
+            const { attributes } = props;
+
+            return (
+                ${save}
             );
-          },
-        save(props) {
-          const { attributes } = props;
-
-          return (
-            ${save}
-          );
-        },
-    });
-    `;
+            },
+        });
+        `;
+        if (generateIconPreview) {
+            return output.replace(/icon: \s * (')([^']*)(')/, 'icon: $2');
+        }
+        return output;
     };
     const setupVariables = async (htmlContent, options) => {
-        let { basePath, cssFiles, jsFiles, icon, generateIcon, chromePath, name } = options;
-        basePath = basePath || process.cwd();
-        cssFiles = cssFiles || [];
-        jsFiles = jsFiles || [];
-        icon = icon || 'shield';
-        generateIcon = typeof generateIcon === 'boolean' ? generateIcon : false;
-        if (generateIcon && !chromePath) {
-            throw new Error('A path to a chrome executable must be provided.');
-        }
+        let { basePath = process.cwd(), cssFiles = [], jsFiles = [], name = 'My block' } = options;
         const newDir = path.join(basePath, convertName(name));
         try {
             fs.mkdirSync(newDir, { recursive: true });
@@ -475,156 +516,12 @@ const block = async (htmlContent, options) => {
                 jsFiles,
                 cssFiles,
                 htmlContent,
-                basePath: newDir,
-                icon: generateIcon && chromePath ? await generateImagePreview({ ...options, htmlContent, cssFiles, jsFiles, basePath: newDir }) : icon,
+                basePath: newDir
             };
         }
         catch (error) {
             logError(error);
         }
-    };
-    const testHtmlContent = (htmlContent) => {
-        return {
-            hasHTMLTags: /<html[^>]*>/i.test(htmlContent),
-            hasHeadTags: /<head[^>]*>/i.test(htmlContent),
-            hasBodyTags: /<body[^>]*>/i.test(htmlContent),
-        };
-    };
-    const getNewFiles = (files, existingFiles) => {
-        return files.filter((file) => !existingFiles.has(file));
-    };
-    const formJsTag = (file) => {
-        return `<script src="${file}"></script>`;
-    };
-    const formCssTag = (file) => {
-        return `<link rel="stylesheet" href="${file}">`;
-    };
-    const mapNewFilesAs = (files, type) => {
-        return files.map((file) => type === 'javascript' ? formJsTag(file) : formCssTag(file)).join('\n');
-    };
-    const getNewCssFiles = (imageSettings) => {
-        const { htmlContent, cssFiles } = imageSettings;
-        return getNewFiles(cssFiles, new Set(htmlContent.match(/<link[^>]*href="([^"]+)"/gi) || []));
-    };
-    const parseCssFiles = (imageSettings) => {
-        return mapNewFilesAs(getNewCssFiles(imageSettings), 'css');
-    };
-    const getNewJsFiles = (imageSettings) => {
-        const { htmlContent, jsFiles } = imageSettings;
-        const existingJSFiles = new Set(htmlContent.match(/<script[^>]*src="([^"]+)"/gi) || []);
-        return getNewFiles(jsFiles, existingJSFiles);
-    };
-    const parseJsFiles = (imageSettings) => {
-        return mapNewFilesAs(getNewJsFiles(imageSettings), 'javascript');
-    };
-    const parseFiles = (imageSettings) => {
-        return {
-            js: parseJsFiles(imageSettings),
-            css: parseCssFiles(imageSettings),
-        };
-    };
-    const formHtmlPage = (imageSettings) => {
-        const { htmlContent } = imageSettings;
-        const { hasHTMLTags, hasHeadTags, hasBodyTags } = testHtmlContent(htmlContent);
-        const { js, css } = parseFiles(imageSettings);
-        let htmlPage = '';
-        if (!hasHTMLTags) {
-            htmlPage += `<!DOCTYPE html><html lang="en">`;
-        }
-        if (!hasHeadTags) {
-            htmlPage += `<head>${css}${js}</head>`;
-        }
-        if (!hasBodyTags) {
-            htmlPage += `<body>`;
-        }
-        htmlPage += htmlContent;
-        if (hasHeadTags) {
-            htmlPage += `${css}${js}`;
-        }
-        if (!hasBodyTags) {
-            htmlPage += `</body>`;
-        }
-        if (!hasHTMLTags) {
-            htmlPage += `</html>`;
-        }
-        return htmlPage;
-    };
-    const configurePage = async (page) => {
-        await page.setViewport({ height: 300, width: 1440 });
-        await page.setUserAgent(userAgent);
-    };
-    const openPage = async (page, htmlContent) => {
-        await page.goto(`data:text/html,${encodeURIComponent(htmlContent)}`, pageOptions);
-    };
-    const getScreenshot = async (page) => {
-        return await page.screenshot({
-            quality: 70,
-            type: 'jpeg',
-            clip: await getElementDimensions(page),
-        });
-    };
-    const getBufferFromPage = async (browser, htmlContent) => {
-        const page = await browser.newPage();
-        await configurePage(page);
-        await openPage(page, htmlContent);
-        return await getScreenshot(page);
-    };
-    const bufferToString = (buffer) => {
-        return Buffer.from(buffer).toString('base64');
-    };
-    const saveBuffer = (filePath, buffer) => {
-        fs.writeFileSync(filePath, buffer);
-        return bufferToString(buffer);
-    };
-    const getImageBuffer = async (browser, filePath, htmlContent) => {
-        await browser.close();
-        return saveBuffer(filePath, await getBufferFromPage(browser, htmlContent));
-    };
-    const getElementDimensions = async (page) => {
-        return page.evaluate(async (innerSelector) => {
-            const elem = document.querySelector(innerSelector);
-            if (!elem) {
-                throw new Error("element not found");
-            }
-            elem.scrollIntoViewIfNeeded();
-            const boundingBox = elem.getBoundingClientRect();
-            return {
-                x: Math.round(boundingBox.x),
-                y: Math.round(boundingBox.y),
-                width: Math.round(boundingBox.width),
-                height: Math.round(boundingBox.height),
-            };
-        }, 'body');
-    };
-    const connect = async (browserWSEndpoint) => {
-        return await puppeteer.connect({ browserWSEndpoint });
-    };
-    const saveImage = async (imageSettings) => {
-        const browserWSEndpoint = await launchBrowser();
-        const filePath = path.join(imageSettings.basePath, 'preview.jpeg');
-        const htmlContent = formHtmlPage(imageSettings);
-        const browser = await connect(browserWSEndpoint);
-        return await getImageBuffer(browser, filePath, htmlContent);
-    };
-    const launchBrowser = async () => {
-        const browser = await puppeteer.launch();
-        return browser.wsEndpoint();
-    };
-    const getIcon = async (imageOptions) => {
-        return `(<img src="data:image/jpeg;base64,${await saveImage(imageOptions)}" />)`;
-    };
-    const generateImagePreview = async (blockOptions) => {
-        let { chromePath, generateIcon, icon } = blockOptions;
-        if (generateIcon && chromePath) {
-            try {
-                spawnSync(chromePath, browserOptions);
-                return getIcon(blockOptions);
-            }
-            catch (error) {
-                logError(error);
-            }
-        }
-        return icon;
     };
     return saveFiles(await setupVariables(htmlContent, options));
 };

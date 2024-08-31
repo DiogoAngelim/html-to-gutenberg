@@ -20,12 +20,14 @@ const userAgent =
   'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/96.0.4664.45 Safari/537.36';
 
 const pageOptions = {
-  waitUntil: 'networkidle0',
+  waitUntil: 'networkidle2',
 };
 
 const characters = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ';
 
 const webpackConfig = `
+
+
 import { fileURLToPath } from 'url';
 import { dirname } from 'path';
 import TerserPlugin from 'terser-webpack-plugin';
@@ -39,8 +41,10 @@ export default {
     minimize: true,
     minimizer: [
       new TerserPlugin({
+        parallel: true,
         terserOptions: {
           keep_fnames: true,
+          ecma: 6,
         },
       }),
     ],
@@ -53,14 +57,13 @@ export default {
     rules: [
       {
         test: /.(js|jsx)$/,
-        use: {
-          loader: 'babel-loader',
-        },
-        exclude: /(node_modules|bower_components)/,
-      },
-    ],
-  },
+        use: ['babel-loader'],
+        exclude: /node_modules/,
+      }
+    ]
+  }
 };
+
 `;
 
 const packageJson = `
@@ -69,40 +72,44 @@ const packageJson = `
   "version": "1.0.0",
   "main": "block.js",
   "type": "module",
-  "devDependencies": {
-    "@babel/core": "^7.24.7",
+  "dependencies": {
+    "@babel/core": "^7.25.2",
+    "@babel/plugin-transform-react-jsx": "^7.25.2",
+    "@babel/preset-env": "^7.25.4",
     "@babel/preset-react": "^7.24.7",
     "babel-loader": "^9.1.3",
     "cross-env": "^7.0.3",
-    "webpack": "^5.92.0",
-    "webpack-cli": "^5.1.4",
-    "terser-webpack-plugin": "^5.3.10"
+    "terser-webpack-plugin": "^5.3.10",
+    "webpack": "^5.94.0",
+    "webpack-cli": "^5.1.4"
   },
   "scripts": {
     "build": "cross-env BABEL_ENV=default NODE_ENV=production webpack && rm -r node_modules",
     "dev": "cross-env BABEL_ENV=default webpack --watch"
   }
 }
+
+
+
 `;
 
 const babelrc = `
 {
 	"presets": [
-		[ "@babel/preset-react", {
-      "pragma": "wp.element.createElement",
-			"modules": false,
-			"targets": {
-				"browsers": [
-					"last 2 Chrome versions",
-					"last 2 Firefox versions",
-					"last 2 Safari versions",
-					"last 2 iOS versions",
-					"last 1 Android version",
-					"last 1 ChromeAndroid version",
-					"ie 11"
-				]
+		[
+			"@babel/preset-react",
+			{
+				"pragma": "wp.element.createElement"
 			}
-		} ]
+		]
+	],
+	"plugins": [
+		[
+			"@babel/plugin-transform-react-jsx",
+			{
+				"pragma": "wp.element.createElement"
+			}
+		]
 	]
 }
 `;
