@@ -1,13 +1,13 @@
-const imports = `
+export const imports: string = `
   const { registerBlockType } = wp.blocks;
   const { RichText, MediaUpload, InspectorControls } = wp.blockEditor;
   const { Panel, PanelBody, PanelRow, TextareaControl, ToggleControl } = wp.components;
 `;
 
-const panels = [];
-const images = [];
+export const panels: any[] = [];
+export const images: any[] = [];
 
-const browserOptions = [
+export const browserOptions: string[] = [
   '--remote-debugging-port=9222',
   '--no-first-run',
   '--no-default-browser-check',
@@ -16,17 +16,16 @@ const browserOptions = [
   '--disable-renderer-backgrounding',
 ];
 
-const userAgent =
+export const userAgent: string =
   'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/96.0.4664.45 Safari/537.36';
 
-const pageOptions = {
+export const pageOptions: any = {
   waitUntil: 'networkidle2',
 };
 
-const characters = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ';
+export const characters: string = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ';
 
-const webpackConfig = `
-
+export const webpackConfig: string = `
 
 import { fileURLToPath } from 'url';
 import { dirname } from 'path';
@@ -66,7 +65,7 @@ export default {
 
 `;
 
-const packageJson = `
+export const packageJson: string = `
 {
   "name": "wp-block",
   "version": "1.0.0",
@@ -93,7 +92,7 @@ const packageJson = `
 
 `;
 
-const babelrc = `
+export const babelrc: string = `
 {
 	"presets": [
 		[
@@ -114,22 +113,8 @@ const babelrc = `
 }
 `;
 
-const editorStyles = `
+export const editorStyles: string = `
 .editor-styles-wrapper .wp-block {
     all: inherit;
 }
 `;
-
-export {
-  imports,
-  panels,
-  images,
-  userAgent,
-  pageOptions,
-  characters,
-  browserOptions,
-  webpackConfig,
-  packageJson,
-  babelrc,
-  editorStyles,
-};

@@ -273,7 +273,7 @@ const block = async (htmlContent: string, options: BlockOptions = { name: 'My bl
       });
 
       return cheerio.load(newHtml, {
-        xml: true,
+        xmlMode: true,
         decodeEntities: false,
       });
     }

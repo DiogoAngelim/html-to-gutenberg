@@ -8,9 +8,6 @@
     "lib": [
       "esnext"
     ],
-    "esModuleInterop": true,
-    "cheerio": [
-      "./node_modules/cheerio/lib/index.d.ts"
-    ]
+    "esModuleInterop": true
   }
 }
