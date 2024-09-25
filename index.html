@@ -1,0 +1,1703 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Html to Gutenberg</title>
+  <style>
+    /*! CSS Used from: http://localhost/wordpress/wp-includes/css/admin-bar.min.css?ver=6.6.2 ; media=all */
+    @media all {
+      html {
+        --wp-admin--admin-bar--height: 32px;
+        scroll-padding-top: var(--wp-admin--admin-bar--height);
+      }
+
+      @media screen and (max-width:782px) {
+        html {
+          --wp-admin--admin-bar--height: 46px;
+        }
+      }
+    }
+
+    /*! CSS Used from: Embedded */
+    @media screen {
+      html {
+        margin-top: 32px !important;
+      }
+    }
+
+    @media screen and (max-width: 782px) {
+      html {
+        margin-top: 46px !important;
+      }
+    }
+
+    /*! CSS Used from: http://localhost/wordpress/wp-content/plugins/tuile/editor-styles.css?ver=1727290115 ; media=all */
+    @media all {
+      * {
+        --wp--preset--font-size--x-large: 14px;
+      }
+    }
+
+    /*! CSS Used from: Embedded */
+    *,
+    ::after,
+    ::before {
+      box-sizing: border-box;
+      border-width: 0;
+      border-style: solid;
+      border-color: #e5e7eb;
+    }
+
+    ::after,
+    ::before {
+      --tw-content: '';
+    }
+
+    html {
+      line-height: 1.5;
+      -webkit-text-size-adjust: 100%;
+      -moz-tab-size: 4;
+      tab-size: 4;
+      font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Noto Sans", sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol", "Noto Color Emoji";
+      font-feature-settings: normal;
+    }
+
+    body {
+      margin: 0;
+      line-height: inherit;
+    }
+
+    h1,
+    h2,
+    h3 {
+      font-size: inherit;
+      font-weight: inherit;
+    }
+
+    strong {
+      font-weight: bolder;
+    }
+
+    button {
+      font-family: inherit;
+      font-size: 100%;
+      font-weight: inherit;
+      line-height: inherit;
+      color: inherit;
+      margin: 0;
+      padding: 0;
+    }
+
+    button {
+      text-transform: none;
+    }
+
+    [type=button],
+    button {
+      -webkit-appearance: button;
+      background-color: transparent;
+      background-image: none;
+    }
+
+    blockquote,
+    dd,
+    dl,
+    h1,
+    h2,
+    h3,
+    p {
+      margin: 0;
+    }
+
+    button {
+      cursor: pointer;
+    }
+
+    :disabled {
+      cursor: default;
+    }
+
+    img,
+    svg {
+      display: block;
+      vertical-align: middle;
+    }
+
+    img {
+      max-width: 100%;
+      height: auto;
+    }
+
+    [hidden] {
+      display: none;
+    }
+
+    *,
+    ::before,
+    ::after {
+      --tw-border-spacing-x: 0;
+      --tw-border-spacing-y: 0;
+      --tw-translate-x: 0;
+      --tw-translate-y: 0;
+      --tw-rotate: 0;
+      --tw-skew-x: 0;
+      --tw-skew-y: 0;
+      --tw-scale-x: 1;
+      --tw-scale-y: 1;
+      --tw-scroll-snap-strictness: proximity;
+      --tw-ring-offset-width: 0px;
+      --tw-ring-offset-color: #fff;
+      --tw-ring-color: rgb(59 130 246 / 0.5);
+      --tw-ring-offset-shadow: 0 0 #0000;
+      --tw-ring-shadow: 0 0 #0000;
+      --tw-shadow: 0 0 #0000;
+      --tw-shadow-colored: 0 0 #0000;
+    }
+
+    .sr-only {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      padding: 0;
+      margin: -1px;
+      overflow: hidden;
+      clip: rect(0, 0, 0, 0);
+      white-space: nowrap;
+      border-width: 0;
+    }
+
+    .absolute {
+      position: absolute;
+    }
+
+    .relative {
+      position: relative;
+    }
+
+    .inset-0 {
+      top: 0px;
+      right: 0px;
+      bottom: 0px;
+      left: 0px;
+    }
+
+    .inset-y-0 {
+      top: 0px;
+      bottom: 0px;
+    }
+
+    .inset-x-0 {
+      left: 0px;
+      right: 0px;
+    }
+
+    .right-0 {
+      right: 0px;
+    }
+
+    .top-0 {
+      top: 0px;
+    }
+
+    .left-full {
+      left: 100%;
+    }
+
+    .z-10 {
+      z-index: 10;
+    }
+
+    .order-2 {
+      order: 2;
+    }
+
+    .order-1 {
+      order: 1;
+    }
+
+    .mx-auto {
+      margin-left: auto;
+      margin-right: auto;
+    }
+
+    .-mr-2 {
+      margin-right: -0.5rem;
+    }
+
+    .mt-10 {
+      margin-top: 2.5rem;
+    }
+
+    .mt-3 {
+      margin-top: 0.75rem;
+    }
+
+    .mt-5 {
+      margin-top: 1.25rem;
+    }
+
+    .mt-2 {
+      margin-top: 0.5rem;
+    }
+
+    .mt-6 {
+      margin-top: 1.5rem;
+    }
+
+    .-mt-32 {
+      margin-top: -8rem;
+    }
+
+    .mt-4 {
+      margin-top: 1rem;
+    }
+
+    .mt-12 {
+      margin-top: 3rem;
+    }
+
+    .mt-8 {
+      margin-top: 2rem;
+    }
+
+    .block {
+      display: block;
+    }
+
+    .inline-block {
+      display: inline-block;
+    }
+
+    .flex {
+      display: flex;
+    }
+
+    .inline-flex {
+      display: inline-flex;
+    }
+
+    .grid {
+      display: grid;
+    }
+
+    .hidden {
+      display: none;
+    }
+
+    .h-full {
+      height: 100%;
+    }
+
+    .h-8 {
+      height: 2rem;
+    }
+
+    .h-6 {
+      height: 1.5rem;
+    }
+
+    .h-56 {
+      height: 14rem;
+    }
+
+    .h-12 {
+      height: 3rem;
+    }
+
+    .h-1\/2 {
+      height: 50%;
+    }
+
+    .w-48 {
+      width: 12rem;
+    }
+
+    .w-full {
+      width: 100%;
+    }
+
+    .w-auto {
+      width: auto;
+    }
+
+    .w-6 {
+      width: 1.5rem;
+    }
+
+    .w-12 {
+      width: 3rem;
+    }
+
+    .max-w-7xl {
+      max-width: 80rem;
+    }
+
+    .max-w-3xl {
+      max-width: 48rem;
+    }
+
+    .max-w-4xl {
+      max-width: 56rem;
+    }
+
+    .max-w-md {
+      max-width: 28rem;
+    }
+
+    .flex-1 {
+      flex: 1 1 0%;
+    }
+
+    .flex-shrink-0 {
+      flex-shrink: 0;
+    }
+
+    .flex-grow {
+      flex-grow: 1;
+    }
+
+    .origin-top-right {
+      transform-origin: top right;
+    }
+
+    .translate-x-1\/2 {
+      --tw-translate-x: 50%;
+      transform: translate(var(--tw-translate-x), var(--tw-translate-y)) rotate(var(--tw-rotate)) skewX(var(--tw-skew-x)) skewY(var(--tw-skew-y)) scaleX(var(--tw-scale-x)) scaleY(var(--tw-scale-y));
+    }
+
+    .-translate-x-1\/2 {
+      --tw-translate-x: -50%;
+      transform: translate(var(--tw-translate-x), var(--tw-translate-y)) rotate(var(--tw-rotate)) skewX(var(--tw-skew-x)) skewY(var(--tw-skew-y)) scaleX(var(--tw-scale-x)) scaleY(var(--tw-scale-y));
+    }
+
+    .-translate-y-3\/4 {
+      --tw-translate-y: -75%;
+      transform: translate(var(--tw-translate-x), var(--tw-translate-y)) rotate(var(--tw-rotate)) skewX(var(--tw-skew-x)) skewY(var(--tw-skew-y)) scaleX(var(--tw-scale-x)) scaleY(var(--tw-scale-y));
+    }
+
+    .-translate-y-1\/2 {
+      --tw-translate-y: -50%;
+      transform: translate(var(--tw-translate-x), var(--tw-translate-y)) rotate(var(--tw-rotate)) skewX(var(--tw-skew-x)) skewY(var(--tw-skew-y)) scaleX(var(--tw-scale-x)) scaleY(var(--tw-scale-y));
+    }
+
+    .transform {
+      transform: translate(var(--tw-translate-x), var(--tw-translate-y)) rotate(var(--tw-rotate)) skewX(var(--tw-skew-x)) skewY(var(--tw-skew-y)) scaleX(var(--tw-scale-x)) scaleY(var(--tw-scale-y));
+    }
+
+    .grid-cols-1 {
+      grid-template-columns: repeat(1, minmax(0, 1fr));
+    }
+
+    .flex-col {
+      flex-direction: column;
+    }
+
+    .items-center {
+      align-items: center;
+    }
+
+    .justify-center {
+      justify-content: center;
+    }
+
+    .justify-between {
+      justify-content: space-between;
+    }
+
+    .gap-y-20 {
+      row-gap: 5rem;
+    }
+
+    .space-y-1> :not([hidden])~ :not([hidden]) {
+      --tw-space-y-reverse: 0;
+      margin-top: calc(0.25rem * calc(1 - var(--tw-space-y-reverse)));
+      margin-bottom: calc(0.25rem * var(--tw-space-y-reverse));
+    }
+
+    .space-y-10> :not([hidden])~ :not([hidden]) {
+      --tw-space-y-reverse: 0;
+      margin-top: calc(2.5rem * calc(1 - var(--tw-space-y-reverse)));
+      margin-bottom: calc(2.5rem * var(--tw-space-y-reverse));
+    }
+
+    .space-x-6> :not([hidden])~ :not([hidden]) {
+      --tw-space-x-reverse: 0;
+      margin-right: calc(1.5rem * var(--tw-space-x-reverse));
+      margin-left: calc(1.5rem * calc(1 - var(--tw-space-x-reverse)));
+    }
+
+    .overflow-hidden {
+      overflow: hidden;
+    }
+
+    .rounded-md {
+      border-radius: 0.375rem;
+    }
+
+    .rounded-lg {
+      border-radius: 0.5rem;
+    }
+
+    .rounded-2xl {
+      border-radius: 1rem;
+    }
+
+    .rounded-xl {
+      border-radius: 0.75rem;
+    }
+
+    .rounded-bl-2xl {
+      border-bottom-left-radius: 1rem;
+    }
+
+    .rounded-br-2xl {
+      border-bottom-right-radius: 1rem;
+    }
+
+    .border {
+      border-width: 1px;
+    }
+
+    .border-transparent {
+      border-color: transparent;
+    }
+
+    .bg-white {
+      --tw-bg-opacity: 1;
+      background-color: rgb(255 255 255 / var(--tw-bg-opacity));
+    }
+
+    .bg-gray-50 {
+      --tw-bg-opacity: 1;
+      background-color: rgb(249 250 251 / var(--tw-bg-opacity));
+    }
+
+    .bg-indigo-600 {
+      --tw-bg-opacity: 1;
+      background-color: rgb(11 124 178);
+    }
+
+    .bg-indigo-100 {
+      --tw-bg-opacity: 1;
+      background-color: rgb(11 124 178 / 17%);
+    }
+
+    .bg-indigo-500 {
+      --tw-bg-opacity: 1;
+      background-color: rgb(11 124 178);
+    }
+
+    .bg-gray-800 {
+      --tw-bg-opacity: 1;
+      background-color: rgb(31 41 55 / 65%);
+    }
+
+    .bg-indigo-800 {
+      --tw-bg-opacity: 1;
+      background-color: rgb(10 97 139);
+    }
+
+    .bg-indigo-50 {
+      --tw-bg-opacity: 1;
+      background-color: rgb(238 242 255 / var(--tw-bg-opacity));
+    }
+
+    .object-cover {
+      object-fit: cover;
+    }
+
+    .p-2 {
+      padding: 0.5rem;
+    }
+
+    .p-5 {
+      padding: 1.25rem;
+    }
+
+    .p-6 {
+      padding: 1.5rem;
+    }
+
+    .px-4 {
+      padding-left: 1rem;
+      padding-right: 1rem;
+    }
+
+    .px-5 {
+      padding-left: 1.25rem;
+      padding-right: 1.25rem;
+    }
+
+    .px-2 {
+      padding-left: 0.5rem;
+      padding-right: 0.5rem;
+    }
+
+    .px-3 {
+      padding-left: 0.75rem;
+      padding-right: 0.75rem;
+    }
+
+    .py-2 {
+      padding-top: 0.5rem;
+      padding-bottom: 0.5rem;
+    }
+
+    .py-3 {
+      padding-top: 0.75rem;
+      padding-bottom: 0.75rem;
+    }
+
+    .px-8 {
+      padding-left: 2rem;
+      padding-right: 2rem;
+    }
+
+    .py-12 {
+      padding-top: 3rem;
+      padding-bottom: 3rem;
+    }
+
+    .py-24 {
+      padding-top: 6rem;
+      padding-bottom: 6rem;
+    }
+
+    .px-6 {
+      padding-left: 1.5rem;
+      padding-right: 1.5rem;
+    }
+
+    .py-\[20px\] {
+      padding-top: 20px;
+      padding-bottom: 20px;
+    }
+
+    .pb-8 {
+      padding-bottom: 2rem;
+    }
+
+    .pt-6 {
+      padding-top: 1.5rem;
+    }
+
+    .pt-4 {
+      padding-top: 1rem;
+    }
+
+    .pt-2 {
+      padding-top: 0.5rem;
+    }
+
+    .pb-3 {
+      padding-bottom: 0.75rem;
+    }
+
+    .pb-32 {
+      padding-bottom: 8rem;
+    }
+
+    .pt-16 {
+      padding-top: 4rem;
+    }
+
+    .pb-16 {
+      padding-bottom: 4rem;
+    }
+
+    .pt-\[240px\] {
+      padding-top: 120px;
+      padding-bottom: 120px;
+    }
+
+    .text-center {
+      text-align: center;
+    }
+
+    .text-base {
+      font-size: 1rem;
+      line-height: 1.5rem;
+    }
+
+    .text-4xl {
+      font-size: 2.25rem;
+      line-height: 2.5rem;
+    }
+
+    .text-3xl {
+      font-size: 1.875rem;
+      line-height: 2.25rem;
+    }
+
+    .text-lg {
+      font-size: 1.125rem;
+      line-height: 1.75rem;
+    }
+
+    .text-xl {
+      font-size: 1.25rem;
+      line-height: 1.75rem;
+    }
+
+    .text-5xl {
+      font-size: 3rem;
+      line-height: 1;
+    }
+
+    .text-2xl {
+      font-size: 1.5rem;
+      line-height: 2rem;
+    }
+
+    .font-medium {
+      font-weight: 500;
+    }
+
+    .font-extrabold {
+      font-weight: 800;
+    }
+
+    .leading-6 {
+      line-height: 1.5rem;
+    }
+
+    .tracking-tight {
+      letter-spacing: -0.025em;
+    }
+
+    .text-white {
+      --tw-text-opacity: 1;
+      color: rgb(255 255 255 / var(--tw-text-opacity));
+    }
+
+    .text-gray-400 {
+      --tw-text-opacity: 1;
+      color: rgb(156 163 175 / var(--tw-text-opacity));
+    }
+
+    .text-gray-500 {
+      --tw-text-opacity: 1;
+      color: rgb(107 114 128 / var(--tw-text-opacity));
+    }
+
+    .text-indigo-600 {
+      --tw-text-opacity: 1;
+      color: rgb(11 124 178);
+    }
+
+    .text-gray-700 {
+      --tw-text-opacity: 1;
+      color: rgb(55 65 81 / var(--tw-text-opacity));
+    }
+
+    .text-gray-900 {
+      --tw-text-opacity: 1;
+      color: rgb(17 24 39 / var(--tw-text-opacity));
+    }
+
+    .text-indigo-700 {
+      --tw-text-opacity: 1;
+      color: rgb(11 124 178);
+    }
+
+    .text-gray-300 {
+      --tw-text-opacity: 1;
+      color: rgb(209 213 219 / var(--tw-text-opacity));
+    }
+
+    .text-indigo-200 {
+      --tw-text-opacity: 1;
+      color: rgb(224 231 255 / var(--tw-text-opacity));
+    }
+
+    .text-indigo-100 {
+      --tw-text-opacity: 1;
+      color: rgb(224 231 255 / var(--tw-text-opacity));
+    }
+
+    .opacity-25 {
+      opacity: 0.25;
+    }
+
+    .mix-blend-multiply {
+      mix-blend-mode: multiply;
+    }
+
+    .shadow-md {
+      --tw-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
+      --tw-shadow-colored: 0 4px 6px -1px var(--tw-shadow-color), 0 2px 4px -2px var(--tw-shadow-color);
+      box-shadow: var(--tw-ring-offset-shadow, 0 0 #0000), var(--tw-ring-shadow, 0 0 #0000), var(--tw-shadow);
+    }
+
+    .shadow {
+      --tw-shadow: 0 1px 3px 0 rgb(0 0 0 / 0.1), 0 1px 2px -1px rgb(0 0 0 / 0.1);
+      --tw-shadow-colored: 0 1px 3px 0 var(--tw-shadow-color), 0 1px 2px -1px var(--tw-shadow-color);
+      box-shadow: var(--tw-ring-offset-shadow, 0 0 #0000), var(--tw-ring-shadow, 0 0 #0000), var(--tw-shadow);
+    }
+
+    .shadow-xl {
+      --tw-shadow: 0 20px 25px -5px rgb(0 0 0 / 0.1), 0 8px 10px -6px rgb(0 0 0 / 0.1);
+      --tw-shadow-colored: 0 20px 25px -5px var(--tw-shadow-color), 0 8px 10px -6px var(--tw-shadow-color);
+      box-shadow: var(--tw-ring-offset-shadow, 0 0 #0000), var(--tw-ring-shadow, 0 0 #0000), var(--tw-shadow);
+    }
+
+    .shadow-lg {
+      --tw-shadow: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
+      --tw-shadow-colored: 0 10px 15px -3px var(--tw-shadow-color), 0 4px 6px -4px var(--tw-shadow-color);
+      box-shadow: var(--tw-ring-offset-shadow, 0 0 #0000), var(--tw-ring-shadow, 0 0 #0000), var(--tw-shadow);
+    }
+
+    .ring-1 {
+      --tw-ring-offset-shadow: var(--tw-ring-inset) 0 0 0 var(--tw-ring-offset-width) var(--tw-ring-offset-color);
+      --tw-ring-shadow: var(--tw-ring-inset) 0 0 0 calc(1px + var(--tw-ring-offset-width)) var(--tw-ring-color);
+      box-shadow: var(--tw-ring-offset-shadow), var(--tw-ring-shadow), var(--tw-shadow, 0 0 #0000);
+    }
+
+    .ring-black {
+      --tw-ring-opacity: 1;
+      --tw-ring-color: rgb(0 0 0 / var(--tw-ring-opacity));
+    }
+
+    .ring-opacity-5 {
+      --tw-ring-opacity: 0.05;
+    }
+
+    .transition {
+      transition-property: color, background-color, border-color, fill, stroke, opacity, box-shadow, transform, filter, -webkit-text-decoration-color, -webkit-backdrop-filter;
+      transition-property: color, background-color, border-color, text-decoration-color, fill, stroke, opacity, box-shadow, transform, filter, backdrop-filter;
+      transition-property: color, background-color, border-color, text-decoration-color, fill, stroke, opacity, box-shadow, transform, filter, backdrop-filter, -webkit-text-decoration-color, -webkit-backdrop-filter;
+      transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+      transition-duration: 150ms;
+    }
+
+    .hover\:bg-gray-100:hover {
+      --tw-bg-opacity: 1;
+      background-color: black;
+    }
+
+    .hover\:bg-gray-50:hover {
+      --tw-bg-opacity: 1;
+      background-color: rgb(249 250 251 / var(--tw-bg-opacity));
+    }
+
+    .hover\:bg-indigo-700:hover {
+      --tw-bg-opacity: 1;
+      background-color: black;
+      color: white;
+    }
+
+    .hover\:bg-indigo-200:hover {
+      --tw-bg-opacity: 1;
+      background-color: black;
+      color: white;
+    }
+
+    .hover\:text-gray-500:hover {
+      --tw-text-opacity: 1;
+      color: white;
+    }
+
+    .hover\:text-gray-600:hover {
+      --tw-text-opacity: 1;
+      color: black;
+    }
+
+    .hover\:text-gray-900:hover {
+      --tw-text-opacity: 1;
+      color: white;
+    }
+
+    .hover\:text-indigo-500:hover {
+      --tw-text-opacity: 1;
+      color: white;
+    }
+
+    .hover\:text-indigo-600:hover {
+      --tw-text-opacity: 1;
+      color: black;
+    }
+
+    .focus\:outline-none:focus {
+      outline: 2px solid transparent;
+      outline-offset: 2px;
+    }
+
+    .focus\:ring-2:focus {
+      --tw-ring-offset-shadow: var(--tw-ring-inset) 0 0 0 var(--tw-ring-offset-width) var(--tw-ring-offset-color);
+      --tw-ring-shadow: var(--tw-ring-inset) 0 0 0 calc(2px + var(--tw-ring-offset-width)) var(--tw-ring-color);
+      box-shadow: var(--tw-ring-offset-shadow), var(--tw-ring-shadow), var(--tw-shadow, 0 0 #0000);
+    }
+
+    .focus\:ring-inset:focus {
+      --tw-ring-inset: inset;
+    }
+
+    .focus\:ring-indigo-500:focus {
+      --tw-ring-opacity: 1;
+      --tw-ring-color: rgb(99 102 241 / var(--tw-ring-opacity));
+    }
+
+    @media (min-width: 640px) {
+      .sm\:mx-auto {
+        margin-left: auto;
+        margin-right: auto;
+      }
+
+      .sm\:mt-12 {
+        margin-top: 3rem;
+      }
+
+      .sm\:mt-5 {
+        margin-top: 1.25rem;
+      }
+
+      .sm\:mt-8 {
+        margin-top: 2rem;
+      }
+
+      .sm\:mt-0 {
+        margin-top: 0px;
+      }
+
+      .sm\:ml-3 {
+        margin-left: 0.75rem;
+      }
+
+      .sm\:mt-4 {
+        margin-top: 1rem;
+      }
+
+      .sm\:flex {
+        display: flex;
+      }
+
+      .sm\:grid {
+        display: grid;
+      }
+
+      .sm\:h-10 {
+        height: 2.5rem;
+      }
+
+      .sm\:h-72 {
+        height: 18rem;
+      }
+
+      .sm\:max-w-xl {
+        max-width: 36rem;
+      }
+
+      .sm\:max-w-3xl {
+        max-width: 48rem;
+      }
+
+      .sm\:max-w-2xl {
+        max-width: 42rem;
+      }
+
+      .sm\:grid-cols-2 {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
+
+      .sm\:grid-cols-3 {
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+      }
+
+      .sm\:justify-center {
+        justify-content: center;
+      }
+
+      .sm\:gap-8 {
+        gap: 2rem;
+      }
+
+      .sm\:gap-x-8 {
+        column-gap: 2rem;
+      }
+
+      .sm\:gap-y-10 {
+        row-gap: 2.5rem;
+      }
+
+      .sm\:space-y-0> :not([hidden])~ :not([hidden]) {
+        --tw-space-y-reverse: 0;
+        margin-top: calc(0px * calc(1 - var(--tw-space-y-reverse)));
+        margin-bottom: calc(0px * var(--tw-space-y-reverse));
+      }
+
+      .sm\:px-6 {
+        padding-left: 1.5rem;
+        padding-right: 1.5rem;
+      }
+
+      .sm\:py-32 {
+        padding-top: 8rem;
+        padding-bottom: 8rem;
+      }
+
+      .sm\:py-16 {
+        padding-top: 4rem;
+        padding-bottom: 4rem;
+      }
+
+      .sm\:pb-16 {
+        padding-bottom: 4rem;
+      }
+
+      .sm\:text-center {
+        text-align: center;
+      }
+
+      .sm\:text-5xl {
+        font-size: 3rem;
+        line-height: 1;
+      }
+
+      .sm\:text-lg {
+        font-size: 1.125rem;
+        line-height: 1.75rem;
+      }
+
+      .sm\:text-4xl {
+        font-size: 2.25rem;
+        line-height: 2.5rem;
+      }
+    }
+
+    @media (min-width: 768px) {
+      .md\:order-2 {
+        order: 2;
+      }
+
+      .md\:order-1 {
+        order: 1;
+      }
+
+      .md\:ml-10 {
+        margin-left: 2.5rem;
+      }
+
+      .md\:mt-16 {
+        margin-top: 4rem;
+      }
+
+      .md\:mt-5 {
+        margin-top: 1.25rem;
+      }
+
+      .md\:mt-0 {
+        margin-top: 0px;
+      }
+
+      .md\:block {
+        display: block;
+      }
+
+      .md\:flex {
+        display: flex;
+      }
+
+      .md\:hidden {
+        display: none;
+      }
+
+      .md\:h-96 {
+        height: 24rem;
+      }
+
+      .md\:w-auto {
+        width: auto;
+      }
+
+      .md\:items-center {
+        align-items: center;
+      }
+
+      .md\:justify-between {
+        justify-content: space-between;
+      }
+
+      .md\:space-x-8> :not([hidden])~ :not([hidden]) {
+        --tw-space-x-reverse: 0;
+        margin-right: calc(2rem * var(--tw-space-x-reverse));
+        margin-left: calc(2rem * calc(1 - var(--tw-space-x-reverse)));
+      }
+
+      .md\:py-4 {
+        padding-top: 1rem;
+        padding-bottom: 1rem;
+      }
+
+      .md\:px-10 {
+        padding-left: 2.5rem;
+        padding-right: 2.5rem;
+      }
+
+      .md\:px-8 {
+        padding-left: 2rem;
+        padding-right: 2rem;
+      }
+
+      .md\:pb-20 {
+        padding-bottom: 5rem;
+      }
+
+      .md\:pr-4 {
+        padding-right: 1rem;
+      }
+
+      .md\:text-6xl {
+        font-size: 3.75rem;
+        line-height: 1;
+      }
+
+      .md\:text-xl {
+        font-size: 1.25rem;
+        line-height: 1.75rem;
+      }
+
+      .md\:text-lg {
+        font-size: 1.125rem;
+        line-height: 1.75rem;
+      }
+
+      .md\:text-5xl {
+        font-size: 3rem;
+        line-height: 1;
+      }
+
+      .md\:text-4xl {
+        font-size: 2.25rem;
+        line-height: 2.5rem;
+      }
+    }
+
+    @media (min-width: 1024px) {
+      .lg\:absolute {
+        position: absolute;
+      }
+
+      .lg\:relative {
+        position: relative;
+      }
+
+      .lg\:inset-y-0 {
+        top: 0px;
+        bottom: 0px;
+      }
+
+      .lg\:right-0 {
+        right: 0px;
+      }
+
+      .lg\:left-auto {
+        left: auto;
+      }
+
+      .lg\:right-full {
+        right: 100%;
+      }
+
+      .lg\:z-10 {
+        z-index: 10;
+      }
+
+      .lg\:col-span-1 {
+        grid-column: span 1 / span 1;
+      }
+
+      .lg\:col-span-2 {
+        grid-column: span 2 / span 2;
+      }
+
+      .lg\:m-0 {
+        margin: 0px;
+      }
+
+      .lg\:mx-0 {
+        margin-left: 0px;
+        margin-right: 0px;
+      }
+
+      .lg\:mx-auto {
+        margin-left: auto;
+        margin-right: auto;
+      }
+
+      .lg\:-my-8 {
+        margin-top: -2rem;
+        margin-bottom: -2rem;
+      }
+
+      .lg\:mt-20 {
+        margin-top: 5rem;
+      }
+
+      .lg\:mt-0 {
+        margin-top: 0px;
+      }
+
+      .lg\:block {
+        display: block;
+      }
+
+      .lg\:flex {
+        display: flex;
+      }
+
+      .lg\:grid {
+        display: grid;
+      }
+
+      .lg\:hidden {
+        display: none;
+      }
+
+      .lg\:h-full {
+        height: 100%;
+      }
+
+      .lg\:w-full {
+        width: 100%;
+      }
+
+      .lg\:w-1\/2 {
+        width: 50%;
+      }
+
+      .lg\:max-w-2xl {
+        max-width: 42rem;
+      }
+
+      .lg\:max-w-7xl {
+        max-width: 80rem;
+      }
+
+      .lg\:max-w-none {
+        max-width: none;
+      }
+
+      .lg\:flex-shrink-0 {
+        flex-shrink: 0;
+      }
+
+      .lg\:flex-grow-0 {
+        flex-grow: 0;
+      }
+
+      .lg\:translate-x-2\/3 {
+        --tw-translate-x: 66.666667%;
+        transform: translate(var(--tw-translate-x), var(--tw-translate-y)) rotate(var(--tw-rotate)) skewX(var(--tw-skew-x)) skewY(var(--tw-skew-y)) scaleX(var(--tw-scale-x)) scaleY(var(--tw-scale-y));
+      }
+
+      .lg\:translate-y-1\/4 {
+        --tw-translate-y: 25%;
+        transform: translate(var(--tw-translate-x), var(--tw-translate-y)) rotate(var(--tw-rotate)) skewX(var(--tw-skew-x)) skewY(var(--tw-skew-y)) scaleX(var(--tw-scale-x)) scaleY(var(--tw-scale-y));
+      }
+
+      .lg\:grid-cols-3 {
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+      }
+
+      .lg\:items-center {
+        align-items: center;
+      }
+
+      .lg\:justify-start {
+        justify-content: flex-start;
+      }
+
+      .lg\:justify-between {
+        justify-content: space-between;
+      }
+
+      .lg\:gap-8 {
+        gap: 2rem;
+      }
+
+      .lg\:gap-x-8 {
+        column-gap: 2rem;
+      }
+
+      .lg\:gap-y-0 {
+        row-gap: 0px;
+      }
+
+      .lg\:p-0 {
+        padding: 0px;
+      }
+
+      .lg\:px-8 {
+        padding-left: 2rem;
+        padding-right: 2rem;
+      }
+
+      .lg\:py-20 {
+        padding-top: 5rem;
+        padding-bottom: 5rem;
+      }
+
+      .lg\:py-24 {
+        padding-top: 6rem;
+        padding-bottom: 6rem;
+      }
+
+      .lg\:px-0 {
+        padding-left: 0px;
+        padding-right: 0px;
+      }
+
+      .lg\:pb-28 {
+        padding-bottom: 7rem;
+      }
+
+      .lg\:pb-0 {
+        padding-bottom: 0px;
+      }
+
+      .lg\:pl-8 {
+        padding-left: 2rem;
+      }
+
+      .lg\:text-left {
+        text-align: left;
+      }
+
+      .lg\:text-6xl {
+        font-size: 3.75rem;
+        line-height: 1;
+      }
+    }
+
+    @media (min-width: 1280px) {
+      .xl\:mt-28 {
+        margin-top: 7rem;
+      }
+
+      .xl\:inline {
+        display: inline;
+      }
+
+      .xl\:pb-32 {
+        padding-bottom: 8rem;
+      }
+    }
+  </style>
+</head>
+
+<body class="page-template-default page page-id-101 logged-in admin-bar no-customize-support wp-embed-responsive"
+  data-new-gr-c-s-check-loaded="14.1197.0" data-gr-ext-installed="">
+
+
+
+  <div class="wp-site-blocks">
+    <header class="wp-block-template-part">
+
+    </header>
+
+
+    <main class="wp-block-group" id="wp--skip-link--target">
+      <div class="entry-content wp-block-post-content">
+        <div class="wp-block-wp-with-angled-image-on-right">
+          <div>
+            <div class="relative bg-white overflow-hidden">
+              <div class="max-w-7xl mx-auto">
+                <div class="relative z-10 pb-8 bg-white sm:pb-16 md:pb-20 lg:max-w-2xl lg:w-full lg:pb-28 xl:pb-32"><svg
+                    class="hidden lg:block absolute right-0 inset-y-0 h-full w-48 text-white transform translate-x-1/2"
+                    fill="currentColor" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">
+                    <polygon points="50,0 100,0 50,100 0,100"></polygon>
+                  </svg>
+                  <div>
+                    <div class="relative pt-6 px-4 sm:px-6 lg:px-8">
+                      <nav class="relative flex items-center justify-between sm:h-10 lg:justify-start"
+                        aria-label="Global">
+                        <div class="flex items-center flex-grow flex-shrink-0 lg:flex-grow-0">
+                          <div class="flex items-center justify-between w-full md:w-auto">
+                            <div class="-mr-2 flex items-center md:hidden"><button type="button"
+                                class="bg-white rounded-md p-2 inline-flex items-center justify-center text-gray-400 hover:text-gray-500 hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-inset focus:ring-indigo-500"
+                                aria-expanded="false"> <span class="sr-only">Open main menu</span><svg class="h-6 w-6"
+                                  xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"
+                                  stroke="currentColor" aria-hidden="true">
+                                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                    d="M4 6h16M4 12h16M4 18h16"></path>
+                                </svg></button></div>
+                          </div>
+                        </div>
+                        <div class="hidden md:block md:ml-10 md:pr-4 md:space-x-8"> <span
+                            class="font-medium text-gray-500 hover:text-gray-900"></span><span
+                            class="font-medium text-gray-500 hover:text-gray-900"></span><span
+                            class="font-medium text-gray-500 hover:text-gray-900"></span><span
+                            class="font-medium text-gray-500 hover:text-gray-900"></span><span
+                            class="font-medium text-indigo-600 hover:text-indigo-500"></span></div>
+                      </nav>
+                    </div>
+                    <div class="absolute z-10 top-0 inset-x-0 p-2 transition transform origin-top-right md:hidden">
+                      <div class="rounded-lg shadow-md bg-white ring-1 ring-black ring-opacity-5 overflow-hidden">
+                        <div class="px-5 pt-4 flex items-center justify-between">
+                          <div><img decoding="async"
+                              src="http://localhost/wordpress/wp-content/plugins/tuile/components/marketing/sections/heroes/with-angled-image-on-right/img/logos/workflow-mark-indigo-600.svg"
+                              alt="" class="h-8 w-auto"></div>
+                          <div class="-mr-2"><button type="button"
+                              class="bg-white rounded-md p-2 inline-flex items-center justify-center text-gray-400 hover:text-gray-500 hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-inset focus:ring-indigo-500">
+                              <span class="sr-only">Close main menu</span><svg class="h-6 w-6"
+                                xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor"
+                                aria-hidden="true">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                  d="M6 18L18 6M6 6l12 12"></path>
+                              </svg></button></div>
+                        </div>
+                        <div class="px-2 pt-2 pb-3 space-y-1"> <span
+                            class="block px-3 py-2 rounded-md text-base font-medium text-gray-700 hover:text-gray-900 hover:bg-gray-50">Product</span><span
+                            class="block px-3 py-2 rounded-md text-base font-medium text-gray-700 hover:text-gray-900 hover:bg-gray-50">Features</span><span
+                            class="block px-3 py-2 rounded-md text-base font-medium text-gray-700 hover:text-gray-900 hover:bg-gray-50">Marketplace</span><span
+                            class="block px-3 py-2 rounded-md text-base font-medium text-gray-700 hover:text-gray-900 hover:bg-gray-50">Company</span>
+                        </div> <span
+                          class="block w-full px-5 py-3 text-center font-medium text-indigo-600 bg-gray-50 hover:bg-gray-100">
+                          Log in </span>
+                      </div>
+                    </div>
+                  </div>
+                  <main class="mt-10 mx-auto max-w-7xl px-4 sm:mt-12 sm:px-6 md:mt-16 lg:mt-20 lg:px-8 xl:mt-28">
+                    <div class="sm:text-center lg:text-left">
+                      <h1 class="text-4xl tracking-tight font-extrabold text-gray-900 sm:text-5xl md:text-6xl"><span
+                          class="block xl:inline"><strong>Effortless WordPress Integration </strong></span><span
+                          class="block text-indigo-600 xl:inline">in <strong>no time </strong></span></h1>
+                      <p
+                        class="mt-3 text-base text-gray-500 sm:mt-5 sm:text-lg sm:max-w-xl sm:mx-auto md:mt-5 md:text-xl lg:mx-0">
+                        Tired of manually creating WordPress blocks from HTML? Save time and effort with our powerful
+                        tool that converts your HTML directly into fully customizable Gutenberg blocks. Whether you’re a
+                        developer or content creator, streamline your workflow and focus on what matters most.</p>
+                      <div class="mt-5 sm:mt-8 sm:flex sm:justify-center lg:justify-start">
+                        <a href="https://www.npmjs.com/package/html-to-gutenberg/" target="_blank"
+                          class="rounded-md shadow" style="text-decoration: none;"> <span
+                            class="w-full flex items-center justify-center no-underline px-8 py-3 border border-transparent text-base font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 md:py-4 md:text-lg md:px-10">
+                            Get started – It’s free</span></a>
+                        <a href="https://youtu.be/-IUb8e8gLDk" target="_blank" class="no-underline mt-3 sm:mt-0 sm:ml-3"
+                          style="text-decoration: none;"> <span style="text-decoration: none;"
+                            class="no-underline flex items-center justify-center px-8 py-3 border border-transparent text-base font-medium rounded-md text-indigo-700 bg-indigo-100 hover:bg-indigo-200 md:py-4 md:text-lg md:px-10">Watch
+                            Demo</span></a>
+                      </div>
+                    </div>
+                  </main>
+                </div>
+              </div>
+              <div class="lg:absolute lg:inset-y-0 lg:right-0 lg:w-1/2"><img decoding="async"
+                  class="h-56 w-full object-cover sm:h-72 md:h-96 lg:w-full lg:h-full"
+                  src="https://www.danielmcclure.com/wp-content/uploads/gutenberg.png" alt=""></div>
+            </div>
+          </div>
+        </div>
+
+
+
+        <div class="wp-block-wp-offset-2x2-grid">
+          <div>
+            <div class="bg-gray-50 overflow-hidden">
+              <div class="relative max-w-7xl mx-auto pt-[240px] px-4 sm:px-6 lg:px-8"><svg
+                  class="absolute top-0 left-full transform -translate-x-1/2 -translate-y-3/4 lg:left-auto lg:right-full lg:translate-x-2/3 lg:translate-y-1/4"
+                  width="404" height="784" fill="none" viewBox="0 0 404 784" aria-hidden="true">
+                  <defs>
+                    <pattern id="8b1b5f72-e944-4457-af67-0c6d15a99f38" x="0" y="0" width="20" height="20"
+                      patternUnits="userSpaceOnUse">
+                      <rect x="0" y="0" width="4" height="4" classname="text-gray-200" fill="lightgray"></rect>
+                    </pattern>
+                  </defs>
+                  <rect width="404" height="784" fill="url(#8b1b5f72-e944-4457-af67-0c6d15a99f38)"></rect>
+                </svg>
+                <div class="relative lg:grid lg:grid-cols-3 lg:gap-x-8">
+                  <div class="lg:col-span-1">
+                    <h2 class="text-3xl font-extrabold tracking-tight text-gray-900 sm:text-4xl">A better way to edit
+                      content.</h2>
+                  </div>
+                  <dl
+                    class="mt-10 space-y-10 sm:space-y-0 sm:grid sm:grid-cols-2 sm:gap-x-8 sm:gap-y-10 lg:mt-0 lg:col-span-2">
+                    <div>
+                      <dt>
+                        <div class="flex items-center justify-center h-12 w-12 rounded-md bg-indigo-500 text-white"><svg
+                            class="h-6 w-6" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"
+                            stroke="currentColor" aria-hidden="true">
+                            <path class="size-6" stroke-linecap="round" stroke-linejoin="round"
+                              d="M7.5 21 3 16.5m0 0L7.5 12M3 16.5h13.5m0-13.5L21 7.5m0 0L16.5 12M21 7.5H7.5" />
+                          </svg></div>
+                        <p class="mt-5 text-lg leading-6 font-medium text-gray-900">Instant Conversions</p>
+                      </dt>
+                      <dd class="mt-2 text-base text-gray-500">With instant conversions, transform your HTML into fully
+                        functional Gutenberg blocks in seconds.</dd>
+                    </div>
+                    <div>
+                      <dt>
+                        <div class="flex items-center justify-center h-12 w-12 rounded-md bg-indigo-500 text-white"><svg
+                            class="h-6 w-6" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"
+                            stroke="currentColor" aria-hidden="true">
+                            <path stroke-linecap="round" stroke-linejoin="round"
+                              d="M12 6v6h4.5m4.5 0a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />
+                          </svg></div>
+                        <p class="mt-5 text-lg leading-6 font-medium text-gray-900">Time-Saving Automation</p>
+                      </dt>
+                      <dd class="mt-2 text-base text-gray-500">Boost your efficiency by eliminating the need for manual
+                        coding and repetitive
+                        tasks. </dd>
+                    </div>
+                    <div>
+                      <dt>
+                        <div class="flex items-center justify-center h-12 w-12 rounded-md bg-indigo-500 text-white"><svg
+                            class="h-6 w-6" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"
+                            stroke="currentColor" aria-hidden="true">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                              d="M13 10V3L4 14h7v7l9-11h-7z"></path>
+                          </svg></div>
+                        <p class="mt-5 text-lg leading-6 font-medium text-gray-900">Seamless WordPress Integration</p>
+                      </dt>
+                      <dd class="mt-2 text-base text-gray-500">Ensure that your converted Gutenberg blocks work
+                        flawlessly with any WordPress theme. </dd>
+                    </div>
+                    <div>
+                      <dt>
+                        <div class="flex items-center justify-center h-12 w-12 rounded-md bg-indigo-500 text-white"><svg
+                            class="h-6 w-6" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"
+                            stroke="currentColor" aria-hidden="true">
+                            <path stroke-linecap="round" stroke-linejoin="round"
+                              d="M9.53 16.122a3 3 0 0 0-5.78 1.128 2.25 2.25 0 0 1-2.4 2.245 4.5 4.5 0 0 0 8.4-2.245c0-.399-.078-.78-.22-1.128Zm0 0a15.998 15.998 0 0 0 3.388-1.62m-5.043-.025a15.994 15.994 0 0 1 1.622-3.395m3.42 3.42a15.995 15.995 0 0 0 4.764-4.648l3.876-5.814a1.151 1.151 0 0 0-1.597-1.597L14.146 6.32a15.996 15.996 0 0 0-4.649 4.763m3.42 3.42a6.776 6.776 0 0 0-3.42-3.42" />
+                          </svg></div>
+                        <p class="mt-5 text-lg leading-6 font-medium text-gray-900">Customizable Blocks</p>
+                      </dt>
+                      <dd class="mt-2 text-base text-gray-500">Easily modify text, images, links, and icons
+                        directly in the Gutenberg editor. </dd>
+                    </div>
+                  </dl>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+
+
+        <div class="wp-block-wp-with-background-image-and-overlapping-cards">
+          <div>
+            <div class="bg-white">
+              <div class="relative pb-32 bg-gray-800">
+                <div class="absolute inset-0"><img decoding="async" class="w-full h-full object-cover"
+                    src="http://localhost/wordpress/wp-content/plugins/tuile/components/marketing/sections/header/with-background-image-and-overlapping-cards/photo-1525130413817-d45c1d127c42.jpeg"
+                    alt="">
+                  <div class="absolute inset-0 bg-gray-800 mix-blend-multiply" aria-hidden="true"></div>
+                </div>
+                <div class="relative max-w-7xl mx-auto py-24 px-4 sm:py-32 sm:px-6 lg:px-8">
+                  <h1 class="text-4xl font-extrabold tracking-tight text-white md:text-5xl lg:text-6xl">How It Works
+                  </h1>
+                  <p class="mt-6 max-w-3xl text-xl text-gray-300">Provide your HTML, and our tool instantly converts it
+                    into fully editable Gutenberg blocks. Upload as a WordPress plugin and there you go.</p>
+                </div>
+              </div>
+              <section class="-mt-32 max-w-7xl mx-auto relative z-10 pb-32 px-4 sm:px-6 lg:px-8"
+                aria-labelledby="contact-heading">
+                <h2 class="sr-only" id="contact-heading">Contact us</h2>
+                <div class="grid grid-cols-1 gap-y-20 lg:grid-cols-3 lg:gap-y-0 lg:gap-x-8">
+                  <div class="flex flex-col bg-white rounded-2xl shadow-xl">
+                    <div class="flex-1 relative pt-16 px-6 pb-8 md:px-8">
+                      <div
+                        class="absolute top-0 p-5 inline-block bg-indigo-600 rounded-xl shadow-lg transform -translate-y-1/2">
+                        <svg class="h-6 w-6 text-white" xmlns="http://www.w3.org/2000/svg" fill="none"
+                          viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
+                          <path stroke-linecap="round" stroke-linejoin="round"
+                            d="M14.25 9.75 16.5 12l-2.25 2.25m-4.5 0L7.5 12l2.25-2.25M6 20.25h12A2.25 2.25 0 0 0 20.25 18V6A2.25 2.25 0 0 0 18 3.75H6A2.25 2.25 0 0 0 3.75 6v12A2.25 2.25 0 0 0 6 20.25Z" />
+                        </svg>
+                      </div>
+                      <h3 class="text-xl font-medium text-gray-900">Enter Your HTML block string to the API</h3>
+                      <p class="mt-4 text-base text-gray-500">Simply enter a valid HTML block string, and our tool will
+                        automatically recognize the content structure. No need for extra setup or configurations.</p>
+                    </div>
+                    <a href="https://youtu.be/-IUb8e8gLDk" target="_blank"
+                      class="no-underline p-6 bg-gray-50 rounded-bl-2xl rounded-br-2xl md:px-8"> <span
+                        class="no-underline text-base font-medium text-indigo-700 hover:text-indigo-600"><br>Watch the
+                        demo<span aria-hidden="true"> →</span></span></a>
+                  </div>
+                  <div class="flex flex-col bg-white rounded-2xl shadow-xl">
+                    <div class="flex-1 relative pt-16 px-6 pb-8 md:px-8">
+                      <div
+                        class="absolute top-0 p-5 inline-block bg-indigo-600 rounded-xl shadow-lg transform -translate-y-1/2">
+                        <svg class="h-6 w-6 text-white" xmlns="http://www.w3.org/2000/svg" fill="none"
+                          viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
+                          <path stroke-linecap="round" stroke-linejoin="round"
+                            d="M3.75 9.776c.112-.017.227-.026.344-.026h15.812c.117 0 .232.009.344.026m-16.5 0a2.25 2.25 0 0 0-1.883 2.542l.857 6a2.25 2.25 0 0 0 2.227 1.932H19.05a2.25 2.25 0 0 0 2.227-1.932l.857-6a2.25 2.25 0 0 0-1.883-2.542m-16.5 0V6A2.25 2.25 0 0 1 6 3.75h3.879a1.5 1.5 0 0 1 1.06.44l2.122 2.12a1.5 1.5 0 0 0 1.06.44H18A2.25 2.25 0 0 1 20.25 9v.776" />
+                        </svg>
+                      </div>
+                      <h3 class="text-xl font-medium text-gray-900">Our tool converts and generate the dependencies for
+                        you</h3>
+                      <p class="mt-4 text-base text-gray-500">Within seconds, your HTML is transformed into a few
+                        project files, preserving layout and design. The block is ready for building right next.</p>
+                    </div>
+                    <a href="https://youtu.be/-IUb8e8gLDk" target="_blank"
+                      class="no-underline p-6 bg-gray-50 rounded-bl-2xl rounded-br-2xl md:px-8"> <span
+                        class="no-underline text-base font-medium text-indigo-700 hover:text-indigo-600">Watch the
+                        demo<span aria-hidden="true"> →</span></span></a>
+                  </div>
+                  <div class="flex flex-col bg-white rounded-2xl shadow-xl">
+                    <div class="flex-1 relative pt-16 px-6 pb-8 md:px-8">
+                      <div
+                        class="absolute top-0 p-5 inline-block bg-indigo-600 rounded-xl shadow-lg transform -translate-y-1/2">
+                        <svg class="h-6 w-6 text-white" xmlns="http://www.w3.org/2000/svg" fill="none"
+                          viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
+                          <path stroke-linecap="round" stroke-linejoin="round"
+                            d="M14.25 6.087c0-.355.186-.676.401-.959.221-.29.349-.634.349-1.003 0-1.036-1.007-1.875-2.25-1.875s-2.25.84-2.25 1.875c0 .369.128.713.349 1.003.215.283.401.604.401.959v0a.64.64 0 0 1-.657.643 48.39 48.39 0 0 1-4.163-.3c.186 1.613.293 3.25.315 4.907a.656.656 0 0 1-.658.663v0c-.355 0-.676-.186-.959-.401a1.647 1.647 0 0 0-1.003-.349c-1.036 0-1.875 1.007-1.875 2.25s.84 2.25 1.875 2.25c.369 0 .713-.128 1.003-.349.283-.215.604-.401.959-.401v0c.31 0 .555.26.532.57a48.039 48.039 0 0 1-.642 5.056c1.518.19 3.058.309 4.616.354a.64.64 0 0 0 .657-.643v0c0-.355-.186-.676-.401-.959a1.647 1.647 0 0 1-.349-1.003c0-1.035 1.008-1.875 2.25-1.875 1.243 0 2.25.84 2.25 1.875 0 .369-.128.713-.349 1.003-.215.283-.4.604-.4.959v0c0 .333.277.599.61.58a48.1 48.1 0 0 0 5.427-.63 48.05 48.05 0 0 0 .582-4.717.532.532 0 0 0-.533-.57v0c-.355 0-.676.186-.959.401-.29.221-.634.349-1.003.349-1.035 0-1.875-1.007-1.875-2.25s.84-2.25 1.875-2.25c.37 0 .713.128 1.003.349.283.215.604.401.96.401v0a.656.656 0 0 0 .658-.663 48.422 48.422 0 0 0-.37-5.36c-1.886.342-3.81.574-5.766.689a.578.578 0 0 1-.61-.58v0Z" />
+                        </svg>
+                      </div>
+                      <h3 class="text-xl font-medium text-gray-900">Build valid code, compress, upload as a plugin, and
+                        that’s it.</h3>
+                      <p class="mt-4 text-base text-gray-500">Generate valid, optimized code from the source
+                        automatically. Compress the package, and upload as a WordPress Plugin. Activate it it, and
+                        you’re done.</p>
+                    </div>
+                    <a href="https://youtu.be/-IUb8e8gLDk" target="_blank"
+                      class="no-underline p-6 bg-gray-50 rounded-bl-2xl rounded-br-2xl md:px-8"> <span
+                        class="no-underline text-base font-medium text-indigo-700 hover:text-indigo-600">Watch the
+                        demo<span aria-hidden="true"> →</span></span></a>
+                  </div>
+                </div>
+              </section>
+            </div>
+          </div>
+        </div>
+
+
+
+        <div class="wp-block-wp-simple-on-brand">
+          <div>
+            <div class="bg-indigo-800">
+              <div class="max-w-7xl mx-auto py-12 px-4 sm:py-16 sm:px-6 lg:px-8 lg:py-20">
+                <div class="max-w-4xl mx-auto text-center">
+                  <h2 class="text-3xl font-extrabold text-white sm:text-4xl">Trusted by developers from over 80
+                    companies</h2>
+                  <p class="mt-3 text-xl text-indigo-200 sm:mt-4">Developers from over 80 companies rely on our tool to
+                    streamline their workflow and enhance productivity. From startups to established enterprises,
+                    professionals trust our solution for fast, reliable HTML-to-Gutenberg conversion. Join the growing
+                    community and experience the difference today!</p>
+                </div>
+                <dl class="mt-10 text-center sm:max-w-3xl sm:mx-auto sm:grid sm:grid-cols-3 sm:gap-8">
+                  <div class="flex flex-col">
+                    <dt class="order-2 mt-2 text-lg leading-6 font-medium text-indigo-200">Accuracy</dt>
+                    <dd class="order-1 text-5xl font-extrabold text-white">99%</dd>
+                  </div>
+                  <div class="flex flex-col mt-10 sm:mt-0">
+                    <dt class="order-2 mt-2 text-lg leading-6 font-medium text-indigo-200">Monthly downloads</dt>
+                    <dd class="order-1 text-5xl font-extrabold text-white">1K+</dd>
+                  </div>
+                  <div class="flex flex-col mt-10 sm:mt-0">
+                    <dt class="order-2 mt-2 text-lg leading-6 font-medium text-indigo-200">Blocks built</dt>
+                    <dd class="order-1 text-5xl font-extrabold text-white">2k+</dd>
+                  </div>
+                </dl>
+              </div>
+            </div>
+          </div>
+        </div>
+
+
+
+        <div class="wp-block-wp-with-overlapping-image">
+          <div>
+            <div class="bg-white">
+              <div class="pb-16 bg-indigo-600 lg:pb-0 lg:z-10 lg:relative">
+                <div class="lg:mx-auto lg:max-w-7xl lg:px-8 lg:grid lg:grid-cols-3 lg:gap-8">
+                  <div class="relative lg:-my-8">
+                    <div aria-hidden="true" class="absolute inset-x-0 top-0 h-1/2 bg-white lg:hidden"></div>
+                    <div class="mx-auto max-w-md px-4 sm:max-w-3xl sm:px-6 lg:p-0 lg:h-full">
+                      <div
+                        class="aspect-w-10 aspect-h-6 rounded-xl shadow-xl overflow-hidden sm:aspect-w-16 sm:aspect-h-7 lg:aspect-none lg:h-full">
+                        <img decoding="async"
+                          src="http://localhost/wordpress/wp-content/plugins/tuile/components/marketing/sections/testimonials/with-overlapping-image/photo-1520333789090-1afc82db536a.jpeg"
+                          alt="" class="object-cover lg:h-full lg:w-full">
+                      </div>
+                    </div>
+                  </div>
+                  <div class="mt-12 lg:m-0 lg:col-span-2 lg:pl-8">
+                    <div class="mx-auto max-w-md px-4 sm:max-w-2xl sm:px-6 lg:px-0 lg:py-20 lg:max-w-none">
+                      <blockquote>
+                        <div><svg class="h-12 w-12 text-white opacity-25" fill="currentColor" viewBox="0 0 32 32"
+                            aria-hidden="true">
+                            <path
+                              d="M9.352 4C4.456 7.456 1 13.12 1 19.36c0 5.088 3.072 8.064 6.624 8.064 3.36 0 5.856-2.688 5.856-5.856 0-3.168-2.208-5.472-5.088-5.472-.576 0-1.344.096-1.536.192.48-3.264 3.552-7.104 6.624-9.024L9.352 4zm16.512 0c-4.8 3.456-8.256 9.12-8.256 15.36 0 5.088 3.072 8.064 6.624 8.064 3.264 0 5.856-2.688 5.856-5.856 0-3.168-2.304-5.472-5.184-5.472-.576 0-1.248.096-1.44.192.48-3.264 3.456-7.104 6.528-9.024L25.864 4z">
+                            </path>
+                          </svg>
+                          <p class="mt-6 text-2xl font-medium text-white">This tool has saved me hours of work! The
+                            blocks are perfect and fully editable. I can’t imagine going back to manual conversions.</p>
+                        </div>
+                        <footer class="mt-6">
+                          <p class="text-base font-medium text-white">Judith Black</p>
+                          <p class="text-base font-medium text-indigo-100">CEO at PureInsights</p>
+                        </footer>
+                      </blockquote>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+
+
+        <div class="wp-block-wp-simple-justified-on-light-brand">
+          <div>
+            <div class="bg-indigo-50">
+              <div
+                class="max-w-7xl mx-auto py-12 px-4 sm:px-6 lg:py-24 lg:px-8 lg:flex lg:items-center lg:justify-between">
+                <h2 class="text-3xl font-extrabold tracking-tight text-gray-900 md:text-4xl"><span class="block">Ready
+                    to convert your HTML into WordPress blocks?</span><span class="block text-indigo-600">Start today.
+                    It’s free.</span></h2>
+                <div class="mt-8 flex lg:mt-0 lg:flex-shrink-0">
+                  <a href="https://www.npmjs.com/package/html-to-gutenberg/" target="_blank"
+                    style="text-decoration: none;" class="inline-flex rounded-md shadow"> <span
+                      class="inline-flex items-center justify-center px-5 py-3 border border-transparent text-base font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700">
+                      Get started </span></a>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+
+
+        <div class="wp-block-wp-social-links-only">
+          <div>
+            <footer class="bg-white">
+              <div class="max-w-7xl mx-auto py-[20px] px-4 sm:px-6 md:flex md:items-center md:justify-between lg:px-8">
+                <div class="flex justify-center space-x-6 md:order-2"> <span
+                    class="text-gray-400 hover:text-gray-600"><span class="sr-only">Facebook</span><svg class="h-6 w-6"
+                      fill="currentColor" viewBox="0 0 24 24" aria-hidden="true"></svg></span> <span
+                    class="text-gray-400 hover:text-gray-600"><span class="sr-only">Instagram</span><svg class="h-6 w-6"
+                      fill="currentColor" viewBox="0 0 24 24" aria-hidden="true"></svg></span> <span
+                    class="text-gray-400 hover:text-gray-600"><span class="sr-only">Twitter</span><svg class="h-6 w-6"
+                      fill="currentColor" viewBox="0 0 24 24" aria-hidden="true"></svg></span> <a
+                    href="https://github.com/diogoangelim/html-to-gutenberg/" target="_blank"
+                    class="text-gray-400 hover:text-gray-600"><span class="sr-only">GitHub</span><svg
+                      class="h-6 w-6 hover:text-gray-600" fill="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                      <path fill-rule="evenodd"
+                        d="M12 2C6.477 2 2 6.484 2 12.017c0 4.425 2.865 8.18 6.839 9.504.5.092.682-.217.682-.483 0-.237-.008-.868-.013-1.703-2.782.605-3.369-1.343-3.369-1.343-.454-1.158-1.11-1.466-1.11-1.466-.908-.62.069-.608.069-.608 1.003.07 1.531 1.032 1.531 1.032.892 1.53 2.341 1.088 2.91.832.092-.647.35-1.088.636-1.338-2.22-.253-4.555-1.113-4.555-4.951 0-1.093.39-1.988 1.029-2.688-.103-.253-.446-1.272.098-2.65 0 0 .84-.27 2.75 1.026A9.564 9.564 0 0112 6.844c.85.004 1.705.115 2.504.337 1.909-1.296 2.747-1.027 2.747-1.027.546 1.379.202 2.398.1 2.651.64.7 1.028 1.595 1.028 2.688 0 3.848-2.339 4.695-4.566 4.943.359.309.678.92.678 1.855 0 1.338-.012 2.419-.012 2.747 0 .268.18.58.688.482A10.019 10.019 0 0022 12.017C22 6.484 17.522 2 12 2z"
+                        clip-rule="evenodd"></path>
+                    </svg></a> <a href="https://www.npmjs.com/package/html-to-gutenberg/" target="_blank"
+                    class="text-gray-400 hover:text-gray-600"><span class="sr-only">NPM</span><svg class="h-6 w-6"
+                      fill="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                      <g xmlns="http://www.w3.org/2000/svg">
+                        <path fill="none" d="M0 0H24V24H0z"></path>
+                        <path
+                          d="M20 3c.552 0 1 .448 1 1v16c0 .552-.448 1-1 1H4c-.552 0-1-.448-1-1V4c0-.552.448-1 1-1h16zm-3 4H7v10h5V9.5h2.5V17H17V7z"
+                          fill=""></path>
+                      </g>
+                    </svg></a></div>
+                <div class="mt-8 md:mt-0 md:order-1">
+                  <p class="text-center text-base text-gray-400">© 2024 Diogo Angelim. All rights reserved.</p>
+                </div>
+              </div>
+            </footer>
+          </div>
+        </div>
+      </div>
+    </main>
+  </div>
+
+</body>
+
+</html>
