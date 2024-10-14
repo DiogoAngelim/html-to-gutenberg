@@ -607,9 +607,12 @@ const block = async (htmlContent: string, options: BlockOptions = { name: 'My bl
   }
 
   const getBlock = async (htmlContent: string, settings: BlockOptions): Promise<string> => {
-    const { prefix, name, category, generateIconPreview, basePath } = settings;
+    let { prefix, name, category, generateIconPreview, basePath, cssFiles, jsFiles } = settings;
     const newName = convertName(name);
     const newPrefix = convertName(prefix);
+
+    cssFiles = cssFiles || [];
+    jsFiles = jsFiles || [];
 
     let iconPreview = '\'shield\'';
     let edit = await getEdit(settings);
@@ -620,7 +623,7 @@ const block = async (htmlContent: string, options: BlockOptions = { name: 'My bl
 
     if (generateIconPreview) {
       try {
-        await icon(htmlContent, settings)
+        await icon(htmlContent, { basePath, cssFiles, jsFiles })
         iconPreview = `(<img src="data:image/jpeg;base64,${await imageToBase64(path.join(basePath, 'preview.jpeg'))}" />)`;
       } catch (error: any) {
         console.log(`There was an error generating preview. ${error.message}`);

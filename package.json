@@ -5,9 +5,9 @@
     "axios": "^1.7.7",
     "buffer": "^6.0.3",
     "cheerio": "^1.0.0",
-    "fetch-page-assets": "^1.1.5",
+    "fetch-page-assets": "^1.1.7",
     "fs": "^0.0.1-security",
-    "html-screenshots": "^1.1.8",
+    "html-screenshots": "^1.1.9",
     "image-to-base64": "^2.2.0",
     "node-html-to-jsx": "^1.1.8",
     "path": "^0.12.7"
@@ -15,7 +15,7 @@
   "type": "module",
   "types": "index.ts",
   "name": "html-to-gutenberg",
-  "version": "2.2.4",
+  "version": "2.3.0",
   "description": "Convert HTML strings to editable WP Gutenberg blocks in seconds instead of hours.",
   "main": "index.js",
   "directories": {
@@ -39,6 +39,7 @@
   ],
   "author": "Diogo Angelim",
   "license": "MIT",
+  "funding": "https://www.paypal.com/donate/?hosted_button_id=XA5LN4XR39PMQ",
   "bugs": {
     "url": "https://github.com/DiogoAngelim/html-to-gutenberg/issues"
   },

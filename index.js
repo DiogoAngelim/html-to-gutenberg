@@ -187,7 +187,7 @@ const block = async (htmlContent, options = { name: 'My block', prefix: 'uai', c
                 verbose: false,
             });
             return cheerio.load(newHtml, {
-                xml: true,
+                xmlMode: true,
                 decodeEntities: false,
             });
         }
@@ -453,9 +453,11 @@ const block = async (htmlContent, options = { name: 'My block', prefix: 'uai', c
         return processSaveImages(saveHtmlContent(edit));
     };
     const getBlock = async (htmlContent, settings) => {
-        const { prefix, name, category, generateIconPreview, basePath } = settings;
+        let { prefix, name, category, generateIconPreview, basePath, cssFiles, jsFiles } = settings;
         const newName = convertName(name);
         const newPrefix = convertName(prefix);
+        cssFiles = cssFiles || [];
+        jsFiles = jsFiles || [];
         let iconPreview = '\'shield\'';
         let edit = await getEdit(settings);
         edit = edit.replace(/dangerouslySetInnerHTML="{" {="" __html:="" (.*?)="" }}=""/gm, `dangerouslySetInnerHTML={{ __html: $1 }}`);
@@ -464,7 +466,7 @@ const block = async (htmlContent, options = { name: 'My block', prefix: 'uai', c
         const blockAttributes = `${JSON.parse(JSON.stringify(getComponentAttributes(), null, 2)).replace(/"var.url\+\'(.*?)\'(.*?)"/g, 'vars.url+\'$1\'$2')}`;
         if (generateIconPreview) {
             try {
-                await icon(htmlContent, settings);
+                await icon(htmlContent, { basePath, cssFiles, jsFiles });
                 iconPreview = `(<img src="data:image/jpeg;base64,${await imageToBase64(path.join(basePath, 'preview.jpeg'))}" />)`;
             }
             catch (error) {

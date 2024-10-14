@@ -1,32 +1,24 @@
-const imports = `
+export const imports = `
   const { registerBlockType } = wp.blocks;
   const { RichText, MediaUpload, InspectorControls } = wp.blockEditor;
   const { Panel, PanelBody, PanelRow, TextareaControl, ToggleControl } = wp.components;
 `;
-
-const panels = [];
-const images = [];
-
-const browserOptions = [
-  '--remote-debugging-port=9222',
-  '--no-first-run',
-  '--no-default-browser-check',
-  '--disable-background-timer-throttling',
-  '--disable-backgrounding-occluded-windows',
-  '--disable-renderer-backgrounding',
+export const panels = [];
+export const images = [];
+export const browserOptions = [
+    '--remote-debugging-port=9222',
+    '--no-first-run',
+    '--no-default-browser-check',
+    '--disable-background-timer-throttling',
+    '--disable-backgrounding-occluded-windows',
+    '--disable-renderer-backgrounding',
 ];
-
-const userAgent =
-  'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/96.0.4664.45 Safari/537.36';
-
-const pageOptions = {
-  waitUntil: 'networkidle2',
+export const userAgent = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/96.0.4664.45 Safari/537.36';
+export const pageOptions = {
+    waitUntil: 'networkidle2',
 };
-
-const characters = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ';
-
-const webpackConfig = `
-
+export const characters = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ';
+export const webpackConfig = `
 
 import { fileURLToPath } from 'url';
 import { dirname } from 'path';
@@ -65,8 +57,7 @@ export default {
 };
 
 `;
-
-const packageJson = `
+export const packageJson = `
 {
   "name": "wp-block",
   "version": "1.0.0",
@@ -92,8 +83,7 @@ const packageJson = `
 
 
 `;
-
-const babelrc = `
+export const babelrc = `
 {
 	"presets": [
 		[
@@ -113,23 +103,8 @@ const babelrc = `
 	]
 }
 `;
-
-const editorStyles = `
+export const editorStyles = `
 .editor-styles-wrapper .wp-block {
     all: inherit;
 }
 `;
-
-export {
-  imports,
-  panels,
-  images,
-  userAgent,
-  pageOptions,
-  characters,
-  browserOptions,
-  webpackConfig,
-  packageJson,
-  babelrc,
-  editorStyles,
-};
