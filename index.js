@@ -177,7 +177,7 @@ const block = async (
     const scripts = [];
     let jsMatch;
 
-    html = html.replace(scriptRegex, (_fullMatch, jsContent) => {
+    htmlContent = htmlContent.replace(scriptRegex, (_fullMatch, jsContent) => {
       if (jsContent.trim()) {
         scripts.push({ type: 'inline', content: jsContent });
       }
