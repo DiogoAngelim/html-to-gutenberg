@@ -15,7 +15,7 @@
   "type": "module",
   "types": "index.ts",
   "name": "html-to-gutenberg",
-  "version": "2.4.1",
+  "version": "2.4.2",
   "description": "Convert HTML strings to editable WP Gutenberg blocks in seconds instead of hours.",
   "main": "index.js",
   "directories": {

@@ -16,6 +16,11 @@ import {
   babelrc,
   editorStyles,
 } from './globals.js';
+
+let css = '';
+let js = '';
+const scripts = [];
+const styles = [];
 const block = async (
   htmlContent,
   options = {
@@ -141,64 +146,7 @@ const block = async (
   };
   const saveFiles = async (options) => {
     const { cssFiles = [] } = options;
-    let css = await parseRequirements(cssFiles);
-
-    const styleRegex = /<style[^>]*>([\s\S]*?)<\/style>/gi;
-    const linkRegex = /<link\s+[^>]*href=["']([^"']+)["'][^>]*>/gi;
-
-    const styles = [];
-    let match;
-
-    htmlContent = htmlContent.replace(styleRegex, (_fullMatch, cssContent) => {
-      styles.push({ type: 'inline', content: cssContent });
-      return '';
-    });
-
-    const fetchCssPromises = [];
-    while ((match = linkRegex.exec(htmlContent)) !== null) {
-      const url = match[1];
-      const fetchCssPromise = fetch(url)
-        .then((response) => response.text())
-        .then((css) => styles.push({ type: 'external', content: css }))
-        .catch(() => console.warn(`Failed to fetch: ${url}`));
-      fetchCssPromises.push(fetchCssPromise);
-    }
-
-    htmlContent = htmlContent.replace(linkRegex, '');
-
-    await Promise.all(fetchCssPromises);
-
-    css = styles.map((style) => style.content).join('\n');
-
-    const scriptRegex = /<script[^>]*>([\s\S]*?)<\/script>/gi;
-    const scriptSrcRegex =
-      /<script\s+[^>]*src=["']([^"']+)["'][^>]*>\s*<\/script>/gi;
-
-    const scripts = [];
-    let jsMatch;
-
-    htmlContent = htmlContent.replace(scriptRegex, (_fullMatch, jsContent) => {
-      if (jsContent.trim()) {
-        scripts.push({ type: 'inline', content: jsContent });
-      }
-      return '';
-    });
-
-    const fetchJsPromises = [];
-    while ((jsMatch = scriptSrcRegex.exec(htmlContent)) !== null) {
-      const url = jsMatch[1];
-      const fetchJsPromise = fetch(url)
-        .then((response) => response.text())
-        .then((js) => scripts.push({ type: 'external', content: js }))
-        .catch(() => console.warn(`Failed to fetch script: ${url}`));
-      fetchPromises.push(fetchJsPromise);
-    }
-
-    htmlContent = htmlContent.replace(scriptSrcRegex, '');
-
-    await Promise.all(fetchJsPromises);
-
-    const js = scripts.map((script) => script.content).join('\n');
+    css += await parseRequirements(cssFiles);
 
     saveFile('style.css', css, options);
     saveFile('editor.css', setEditor(css), options);
@@ -661,6 +609,61 @@ const block = async (
     return output;
   };
   const setupVariables = async (htmlContent, options) => {
+    const styleRegex = /<style[^>]*>([\s\S]*?)<\/style>/gi;
+    const linkRegex = /<link\s+[^>]*href=["']([^"']+)["'][^>]*>/gi;
+
+    let match;
+
+    htmlContent = htmlContent.replace(styleRegex, (_fullMatch, cssContent) => {
+      styles.push({ type: 'inline', content: cssContent });
+      return '';
+    });
+
+    const fetchCssPromises = [];
+    while ((match = linkRegex.exec(htmlContent)) !== null) {
+      const url = match[1];
+      const fetchCssPromise = fetch(url)
+        .then((response) => response.text())
+        .then((css) => styles.push({ type: 'external', content: css }))
+        .catch(() => console.warn(`Failed to fetch: ${url}`));
+      fetchCssPromises.push(fetchCssPromise);
+    }
+
+    htmlContent = htmlContent.replace(linkRegex, '');
+
+    await Promise.all(fetchCssPromises);
+
+    css = styles.map((style) => style.content).join('\n');
+
+    const scriptRegex = /<script[^>]*>([\s\S]*?)<\/script>/gi;
+    const scriptSrcRegex =
+      /<script\s+[^>]*src=["']([^"']+)["'][^>]*>\s*<\/script>/gi;
+
+    let jsMatch;
+
+    htmlContent = htmlContent.replace(scriptRegex, (_fullMatch, jsContent) => {
+      if (jsContent.trim()) {
+        scripts.push({ type: 'inline', content: jsContent });
+      }
+      return '';
+    });
+
+    const fetchJsPromises = [];
+    while ((jsMatch = scriptSrcRegex.exec(htmlContent)) !== null) {
+      const url = jsMatch[1];
+      const fetchJsPromise = fetch(url)
+        .then((response) => response.text())
+        .then((js) => scripts.push({ type: 'external', content: js }))
+        .catch(() => console.warn(`Failed to fetch script: ${url}`));
+      fetchPromises.push(fetchJsPromise);
+    }
+
+    htmlContent = htmlContent.replace(scriptSrcRegex, '');
+
+    await Promise.all(fetchJsPromises);
+
+    js = scripts.map((script) => script.content).join('\n');
+
     let {
       basePath = process.cwd(),
       cssFiles = [],
