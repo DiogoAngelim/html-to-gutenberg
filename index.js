@@ -65,78 +65,121 @@ const block = async (
 
     return '';
   };
+
   const getPhp = (options) => {
-    const { name, prefix } = options;
+    const { name, prefix, jsFiles, cssFiles } = options;
     const newName = convertName(name);
     const phpName = convertToUnderscores(name);
     const phpPrefix = convertToUnderscores(prefix);
-    return `
-    <?php
-    /*
-      * Plugin Name:       ${name}
-      * Version:           1.0
-      * Author:            Diogo Angelim
-      * Author URI:        https://github.com/DiogoAngelim/
-    */
 
-    if ( ! defined( 'ABSPATH' ) ) {
-      exit;
-    }
-
-    add_action( 'enqueue_block_editor_assets', '${phpPrefix}_${phpName}_editor_assets' );
-
-      function ${phpPrefix}_${phpName}_editor_assets() {
-      $filepath = plugin_dir_path(__FILE__) . 'block.build.js';
-      $version = file_exists($filepath) ? filemtime($filepath) : time();
-
+    const enqueueRemoteScripts = jsFiles
+      .map((remoteUrl) => {
+        return `
       wp_enqueue_script(
-        '${prefix}-${newName}',
-        plugins_url( 'block.build.js', __FILE__ ),
-        array( 'wp-blocks', 'wp-components', 'wp-element' ,'wp-editor'),
-        $version
-      );
-
-      wp_localize_script( '${prefix}-${newName}', 'vars', array( 'url' => plugin_dir_url( __FILE__ ) ) );
-
-      $filepath = plugin_dir_path(__FILE__) . 'editor.css';
-      $version = file_exists($filepath) ? filemtime($filepath) : time();
-
-      wp_enqueue_style(
-        '${prefix}-${newName}-editor',
-        plugins_url( 'editor.css', __FILE__ ),
-        array( 'wp-edit-blocks' ),
-        $version
-      );
-    }
-
-    add_action( 'enqueue_block_assets', '${phpPrefix}_${phpName}_block_assets' );
-
-    function ${phpPrefix}_${phpName}_block_assets() {
-      $args = array(
-        'handle' => '${prefix}-${newName}-frontend',
-        'src'    => plugins_url( 'style.css', __FILE__ ),
-      );
-      
-      wp_enqueue_block_style(
-        '${prefix}/${newName}',
-        $args
-      );
-
-      $filepath = plugin_dir_path(__FILE__) . 'script.js';
-      $version = file_exists($filepath) ? filemtime($filepath) : time();
-
-      wp_enqueue_script(
-        '${prefix}-${newName}-js',
-        plugins_url( 'scripts.js', __FILE__ ),
+        '${prefix}-${newName}-${remoteUrl
+          .split('/')
+          .pop()
+          .replace(/\.\w+$/, '')}',
+        '${remoteUrl}',
         array(),
-        $version
+        null, // Set to null if you don't have a version
+        true // Load in footer
       );
-
-      wp_localize_script( '${prefix}-${newName}-js', 'vars', array( 'url' => plugin_dir_url( __FILE__ ) ) );
-    }
-
     `;
+      })
+      .join('\n');
+
+    const enqueueRemoteStyles = cssFiles
+      .map((remoteUrl) => {
+        return `
+      wp_enqueue_style(
+        '${prefix}-${newName}-${remoteUrl
+          .split('/')
+          .pop()
+          .replace(/\.\w+$/, '')}',
+        '${remoteUrl}',
+        array(),
+        null // Set to null if you don't have a version
+      );
+    `;
+      })
+      .join('\n');
+
+    return `<?php
+  /*
+    * Plugin Name:       ${name}
+    * Version:           1.0
+    * Author:            Html to Gutenberg
+    * Author URI:        https://www.html-to-gutenberg.io/
+    * Description:       A custom editable block built with Html to Gutenberg
+
+  */
+
+  if ( ! defined( 'ABSPATH' ) ) {
+    exit;
+  }
+
+  function ${phpPrefix}_${phpName}_add_custom_editor_styles() {
+    echo '<style>
+      .block-editor-block-types-list__list-item {
+          width: 100% !important;
+      }
+
+      span.block-editor-block-types-list__item-icon img {
+          max-width: 100%;
+          width: 100%;
+          margin: 0;
+          display: block;
+      }
+
+      span.block-editor-block-icon.has-colors {
+          width: 100%;
+      }
+
+      span.block-editor-block-icon.block-editor-block-switcher__toggle.has-colors img {
+          display: none;
+      }
+    </style>';
+  }
+
+  add_action( 'enqueue_block_editor_assets', '${phpPrefix}_${phpName}_editor_assets' );
+
+  function ${phpPrefix}_${phpName}_editor_assets() {
+    $filepath = plugin_dir_path(__FILE__) . 'block.build.js';
+    $version = file_exists($filepath) ? filemtime($filepath) : time();
+
+    wp_enqueue_script(
+      '${prefix}-${newName}',
+      plugins_url( 'block.build.js', __FILE__ ),
+      array( 'wp-blocks', 'wp-components', 'wp-element' ,'wp-editor'),
+      $version
+    );
+
+    wp_localize_script( '${prefix}-${newName}', 'vars', array( 'url' => plugin_dir_url( __FILE__ ) ) );
+
+    ${enqueueRemoteStyles}
+
+    ${phpPrefix}_${phpName}_add_custom_editor_styles();
+  }
+
+  add_action( 'enqueue_block_assets', '${phpPrefix}_${phpName}_block_assets' );
+
+  function ${phpPrefix}_${phpName}_block_assets() {
+    $args = array(
+      'handle' => '${prefix}-${newName}-frontend',
+      'src'    => plugins_url( 'style.css', __FILE__ ),
+    );
+    
+    wp_enqueue_block_style(
+      '${prefix}/${newName}',
+      $args
+    );
+
+    ${enqueueRemoteScripts}
+  }
+  `;
   };
+
   const setEditor = (css) => {
     return `
       ${editorStyles}
@@ -514,6 +557,34 @@ const block = async (
       ...options,
       htmlContent,
     };
+  };
+
+  const unwrapAnchor = () => {
+    return htmlContent.replace(
+      /<span([^>]*)>\s*<a([^>]*)>(.*?)<\/a>\s*<\/span>/gi,
+      (_, spanAttrs, anchorAttrs, content) => {
+        // Extract attributes from span
+        let allAttrs = {};
+        const attrRegex = /(\S+)=["'](.*?)["']/g;
+
+        let match;
+        while ((match = attrRegex.exec(spanAttrs)) !== null) {
+          allAttrs[match[1]] = match[2];
+        }
+
+        // Merge attributes from anchor
+        while ((match = attrRegex.exec(anchorAttrs)) !== null) {
+          allAttrs[match[1]] = match[2];
+        }
+
+        // Build new anchor tag
+        const newAnchor = `<a ${Object.entries(allAttrs)
+          .map(([key, value]) => `${key}="${value}"`)
+          .join(' ')}>${content}</a>`;
+
+        return newAnchor;
+      }
+    );
   };
   const transformOnClickEvent = (img) => {
     return img.replace(/onClick={[^}]+}\s*/, '');

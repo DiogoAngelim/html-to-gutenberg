@@ -39,7 +39,7 @@ The output will be a file called `block.build.js`, that can be enqueued by the P
 
 ## Example
 
-[WP Tuile](https://github.com/DiogoAngelim/tuile)
+[Working demo](https://www.html-to-gutenberg.io/)
 
 ## Options object reference
 
