@@ -1,56 +1,116 @@
+
 # HTML to Gutenberg Converter
 
-Convert HTML string to valid, editable WordPress Gutenberg blocks in seconds instead of hours. With this script, you can create & build valid Gutenberg blocks that have editable text, inline and background images, as well as SVGs.
+  
+
+Convert HTML string to valid, editable WordPress Gutenberg blocks in seconds instead of hours. With this script, you can create & build valid Gutenberg blocks that have editable text, forms, inline and background images, as well as SVGs. Includes support for TailwindCSS.
+
+  
+
+## Features
+
+  
+
+- 🪄 **Instantly transforms static HTML into Gutenberg blocks**
+Saves hours of manual work by automating block creation from any valid HTML snippet.
+
+- 🔌 **Generates a complete, installable WordPress block plugin**
+Outputs all necessary plugin files (JS, CSS, PHP) so you can drop them into WordPress immediately.
+  
+
+- 🎨 **Keeps your design intact**
+Automatically extracts and preserves CSS from the original HTML into a separate `style.css`.
+
+
+- 🧩 **Modular and scalable**
+Separates assets (JS, CSS, components) into clean files, making it easy to maintain and extend.
+  
+
+- 📦 **Seamlessly integrates with dynamic block systems**
+Works perfectly for headless or custom Gutenberg setups where blocks are registered via JS, not PHP.
+  
+
+- 🚀 **Speeds up prototyping**
+Ideal for quickly testing block ideas or converting landing pages and templates into WordPress blocks.
+
+  
+- 🧠 **Works with your file system or plugin builder logic**
+Since it returns all files as either strings or source files, you can save them however you like (via PHP, APIs, etc.).
+
+
+- 🧰 **Built for automation and customization**
+Can be embedded in custom tools, UIs, or pipelines to generate Gutenberg blocks on demand.
+
+  
+  
 
 ## Installation
 
+  
+
 Install html-to-gutenberg with npm:
 
+  
+
 ```bash
-  npm install html-to-gutenberg
+
+npm  install  html-to-gutenberg
+
 ```
+
+  
 
 ## Usage/Examples
 
+  
+
 ```javascript
+
 // block-generator.js
-import block from 'html-to-gutenberg';
 
-const htmlString = '<div>My content</div>';
+import  block  from  'html-to-gutenberg';
 
-{ 
-  await block(htmlString, {
-    name: 'My Block',
-    prefix: 'gut',
-    category: 'common',
-  });
+const  htmlString = '<div>My content</div>';
+
+{
+	const files = await  block(htmlString, { name:  'My Block' });
+	console.log(files);
 }
+
 ```
 
-Provided a valid html string with the required options, the block function will create a new folder containing the WordPress block with the specified configuration. All you have to do after running the script is enter the directory where the files were created, install the required modules, and compile the block in webpack by running those two commands in the command line:
+  
 
-```bash
-cd my_block
-npm install && npm run build
-```
+Provided a valid html string with the required options, the block function will output the required WordPress block files with the specified configuration. To install the block and its assets, simply load the generated files into the plugins folder and activate it.
 
-
-The output will be a file called `block.build.js`, that can be enqueued by the PHP function in WordPress. That function is automatically generated, so you don't have to worry about it. To install the block and its assets, simply zip the package and upload as a plugin to your WordPress website. 
+  
 
 ## Example
 
+  
+
 [Working demo](https://www.html-to-gutenberg.io/)
+
+  
 
 ## Options object reference
 
-| **Key** | **Description** | **Type** | **Required?** |
-|---|---|---|---|
-| name | The name of your block | string | yes |
-| prefix | A name prefix. e.g., "wp" | string | yes |
-| category | Any existing WP Block category. e.g., "common". Make sure to create any custom category if you need. | string | yes |
-| basePath | Tells where to save the output folder to. Defaults to the current directory. | string | no |
-| generateIconPreview | Tells whether you want to generate a page preview image or not. | boolean | no |            | boolean   | no                                     |
+
+| Option              | Description                                                                                                                                           | Type     | Required?                                                                                          | Default            |
+|---------------------|-------------------------------------------------------------------------------------------------------------------------------------------------------|----------|-----------------------------------------------------------------------------------------------------|-------------------|
+| name                | The name of your block. This will also be used for the folder name and internal references.                                                          | string   | Yes                                                                                                 | My block          |
+| source              | An URL where relative paths resolve to. E.g., `http://localhost/website`.                                                                     | string   | Yes, only if the HTML string or the stylesheet contains relative paths.                             | null              |
+| prefix              | A namespace prefix for the block name, typically aligned with your project (e.g., "wp" or "myplugins").                                              | string   | No                                                                                                  | wp                |
+| category            | The WordPress block category where the block appears in the editor. Use an existing one or register a custom category if needed.                    | string   | No                                                                                                  | common            |
+| basePath            | The absolute path where the output files and folders will be saved.                                                                                  | string   | No                                                                                                  | Current directory |
+| generateIconPreview | If `true`, generates a static image preview (JPEG) of the block's icon for display in the block picker.                                              | boolean  | No                                                                                                  | false             |
+| shouldSaveFiles     | When `true`, the generated block files are saved directly to disk. When `false`, returns an object containing the file contents as strings instead. | boolean  | No                                                                                                  | true              |
+| jsFiles             | An array of external JavaScript file URLs to enqueue with the block on the editor and the frontend. Useful for adding remote libraries.             | string[] | No                                                                                                  | []                |
+| cssFiles            | An array of external CSS file URLs to enqueue with the block on the editor and the frontend. Useful for adding additional remote stylesheets.        | string[] | No                                                                                                  | []                |
+
+
 
 ## License
+  
 
 [MIT](https://github.com/DiogoAngelim/html-to-gutenberg/blob/main/LICENSE.MD)

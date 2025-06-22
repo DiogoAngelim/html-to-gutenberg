@@ -1,7 +1,19 @@
 export const imports = `
   const { registerBlockType } = wp.blocks;
   const { RichText, MediaUpload, InspectorControls } = wp.blockEditor;
-  const { Panel, PanelBody, PanelRow, TextareaControl, ToggleControl } = wp.components;
+  const { 
+    Panel, 
+    PanelBody, 
+    PanelRow, 
+    TextareaControl, 
+    ToggleControl, 
+    Button,
+    TextControl, 
+    Notice
+   } = wp.components;
+
+  const { createRoot, useEffect, useRef } = wp.element;
+
 `;
 export const panels = [];
 export const images = [];
@@ -18,93 +30,3 @@ export const pageOptions = {
     waitUntil: 'networkidle2',
 };
 export const characters = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ';
-export const webpackConfig = `
-
-import { fileURLToPath } from 'url';
-import { dirname } from 'path';
-import TerserPlugin from 'terser-webpack-plugin';
-
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = dirname(__filename);
-
-export default {
-  entry: './block.js',
-  optimization: {
-    minimize: true,
-    minimizer: [
-      new TerserPlugin({
-        parallel: true,
-        terserOptions: {
-          keep_fnames: true,
-          ecma: 6,
-        },
-      }),
-    ],
-  },
-  output: {
-    path: __dirname,
-    filename: 'block.build.js',
-  },
-  module: {
-    rules: [
-      {
-        test: /.(js|jsx)$/,
-        use: ['babel-loader'],
-        exclude: /node_modules/,
-      }
-    ]
-  }
-};
-
-`;
-export const packageJson = `
-{
-  "name": "wp-block",
-  "version": "1.0.0",
-  "main": "block.js",
-  "type": "module",
-  "dependencies": {
-    "@babel/core": "^7.25.2",
-    "@babel/plugin-transform-react-jsx": "^7.25.2",
-    "@babel/preset-env": "^7.25.4",
-    "@babel/preset-react": "^7.24.7",
-    "babel-loader": "^9.1.3",
-    "cross-env": "^7.0.3",
-    "terser-webpack-plugin": "^5.3.10",
-    "webpack": "^5.94.0",
-    "webpack-cli": "^5.1.4"
-  },
-  "scripts": {
-    "build": "cross-env BABEL_ENV=default NODE_ENV=production webpack && rm -r node_modules",
-    "dev": "cross-env BABEL_ENV=default webpack --watch"
-  }
-}
-
-
-
-`;
-export const babelrc = `
-{
-	"presets": [
-		[
-			"@babel/preset-react",
-			{
-				"pragma": "wp.element.createElement"
-			}
-		]
-	],
-	"plugins": [
-		[
-			"@babel/plugin-transform-react-jsx",
-			{
-				"pragma": "wp.element.createElement"
-			}
-		]
-	]
-}
-`;
-export const editorStyles = `
-.editor-styles-wrapper .wp-block {
-    all: inherit;
-}
-`;

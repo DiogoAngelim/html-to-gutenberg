@@ -1,0 +1,8 @@
+node_modules
+*.png
+.git
+*.xml
+*.html
+*.ico
+img
+manifest.json

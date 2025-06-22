@@ -3,7 +3,10 @@ import * as cheerio from 'cheerio';
 import convert from 'node-html-to-jsx';
 import fs from 'fs';
 import path from 'path';
-import extractAssets from 'fetch-page-assets';
+import * as babel from '@babel/core';
+import presetReact from '@babel/preset-react';
+import { transform } from '@svgr/core';
+import extractAssets from 'fetch-page-assets/index.js';
 import icon from 'html-screenshots';
 import imageToBase64 from 'image-to-base64';
 
@@ -11,11 +14,7 @@ import {
   imports,
   panels,
   images,
-  characters,
-  webpackConfig,
-  packageJson,
-  babelrc,
-  editorStyles
+  characters
 } from './globals.js';
 
 interface Attributes {
@@ -55,270 +54,584 @@ interface BlockOptions {
   category: string,
   basePath: string,
   htmlContent?: string,
-  generateIconPreview?: boolean,
   cssFiles?: string[],
   jsFiles?: string[],
+  generateIconPreview?: boolean,
+  shouldSaveFiles?: boolean,
 }
 
-const block = async (htmlContent: string, options: BlockOptions = { name: 'My block', prefix: 'uai', category: 'common', basePath: process.cwd() }): Promise<string> => {
-  const attributes: Attributes = {};
+let js = '';
+let css = '';
+const block = async (
+  htmlContent,
+  options = {
+    name: 'My block',
+    prefix: 'wp',
+    category: 'common',
+    basePath: process.cwd(),
+    shouldSaveFiles: true,
+  }
+) => {
+  const styles = [];
+  const scripts = [];
+  const attributes = {};
 
-  const convertName = (name: string): string => {
-    return name.replace(new RegExp(/\W|_/, 'g'), '-').toLowerCase();
+  function parseStyleString(style) {
+    const entries = style.split(';').filter(Boolean).map(rule => {
+      const [key, value] = rule.split(':');
+      if (!key || !value) return null;
+
+      const camelKey = key.trim().replace(/-([a-z])/g, (_, char) => char.toUpperCase());
+      return [camelKey, value.trim()];
+    }).filter(Boolean);
+
+    const styleObject = Object.fromEntries(entries);
+
+    return JSON.stringify(styleObject).replace(/"([^"]+)":/g, '$1:'); // Strip object keys' quotes
   }
 
-  const saveFile = (fileName: string, contents: string, options: BlockOptions): any => {
+  function sanitizeAndReplaceNumbers(str) {
+    const numberWords = ['zero', 'one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine'];
+    let firstNumberReplaced = false;
+
+    return str
+      .toLowerCase()
+      .replace(/[\s\-_]/g, '')
+      .replace(/\d/g, (digit) => {
+        if (!firstNumberReplaced) {
+          firstNumberReplaced = true;
+          return numberWords[parseInt(digit)] + digit;
+        }
+        return digit; // keep the rest as-is or you can modify as needed
+      })
+      .replace(/^[^a-z]+/, '');
+  }
+
+  const convertName = (name) => {
+    return (name || '').replace(new RegExp(/\W|_/, 'g'), '-').toLowerCase();
+  };
+  const saveFile = (fileName, contents, options) => {
     try {
       const filePath = path.join(options.basePath, fileName);
-
       fs.writeFileSync(filePath, contents);
-
       return contents;
-
-    } catch (error: any) {
+    } catch (error) {
       logError(error);
     }
-  }
-
-  const parseRequirements = async (files: string[]): Promise<string> => {
+  };
+  const parseRequirements = async (files) => {
     let output = '';
-
     for (const file of files) {
       try {
         const { data } = await axios.get(file, { responseType: 'text' });
-
         output += data;
-      } catch (error: any) {
+      } catch (error) {
         logError(error);
       }
     }
-
     return output;
-  }
+  };
+  const convertToUnderscores = (string) => {
+    if (string) {
+      return `${string.replaceAll('-', '_').replaceAll(' ', '_').toLowerCase()}${generateRandomVariableName(
+        'func',
+        3
+      )}`;
+    }
 
-  const convertToUnderscores = (string: string): string => {
-    return `${string.replaceAll('-', '_')}${generateRandomVariableName('func', 3)}`;
-  }
+    return '';
+  };
 
-  const getPhp = (options: BlockOptions): string => {
-    const { name, prefix } = options;
+  const getPhp = (options) => {
+    const { name, prefix, jsFiles, cssFiles } = options;
     const newName = convertName(name);
-
     const phpName = convertToUnderscores(name);
     const phpPrefix = convertToUnderscores(prefix);
 
-    return `
-    <?php
-    /*
-      * Plugin Name:       ${name}
-      * Version:           1.0
-      * Author:            Diogo Angelim
-      * Author URI:        https://github.com/DiogoAngelim/
-    */
+    const inlineRemoteLoader = `
+      var remoteUrls = ${JSON.stringify(jsFiles)};
 
-    if ( ! defined( 'ABSPATH' ) ) {
-      exit;
-    }
+      (function loadScripts() {
+        window._loadedRemoteScripts = window._loadedRemoteScripts || new Set();
 
-    add_action( 'enqueue_block_editor_assets', '${phpPrefix}_${phpName}_editor_assets' );
+        remoteUrls.forEach((url) => {
+          if (window._loadedRemoteScripts.has(url)) return;
 
-      function ${phpPrefix}_${phpName}_editor_assets() {
-      $filepath = plugin_dir_path(__FILE__) . 'block.build.js';
-      $version = file_exists($filepath) ? filemtime($filepath) : time();
+          const script = document.createElement('script');
+          script.src = url;
+          script.async = true;
+          document.head.appendChild(script);
 
-      wp_enqueue_script(
-        '${prefix}-${newName}',
-        plugins_url( 'block.build.js', __FILE__ ),
-        array( 'wp-blocks', 'wp-components', 'wp-element' ,'wp-editor'),
-        $version
-      );
+          window._loadedRemoteScripts.add(url);
+        });
+      })();
+    `;
 
-      wp_localize_script( '${prefix}-${newName}', 'vars', array( 'url' => plugin_dir_url( __FILE__ ) ) );
 
-      $filepath = plugin_dir_path(__FILE__) . 'editor.css';
-      $version = file_exists($filepath) ? filemtime($filepath) : time();
-
+    const enqueueRemoteStyles = cssFiles
+      .map((remoteUrl) => {
+        return `
       wp_enqueue_style(
-        '${prefix}-${newName}-editor',
-        plugins_url( 'editor.css', __FILE__ ),
-        array( 'wp-edit-blocks' ),
-        $version
-      );
-    }
-
-    add_action( 'enqueue_block_assets', '${phpPrefix}_${phpName}_block_assets' );
-
-    function ${phpPrefix}_${phpName}_block_assets() {
-      $args = array(
-        'handle' => '${prefix}-${newName}-frontend',
-        'src'    => plugins_url( 'style.css', __FILE__ ),
-      );
-      
-      wp_enqueue_block_style(
-        '${prefix}/${newName}',
-        $args
-      );
-
-      $filepath = plugin_dir_path(__FILE__) . 'script.js';
-      $version = file_exists($filepath) ? filemtime($filepath) : time();
-
-      wp_enqueue_script(
-        '${prefix}-${newName}-js',
-        plugins_url( 'scripts.js', __FILE__ ),
+        '${prefix}-${newName}-${remoteUrl
+            .split('/')
+            .pop()
+            .replace(/\.\w+$/, '')}',
+        '${remoteUrl}',
         array(),
-        $version
+        null // Set to null if you don't have a version
       );
+    `;
+      })
+      .join('\n');
 
-      wp_localize_script( '${prefix}-${newName}-js', 'vars', array( 'url' => plugin_dir_url( __FILE__ ) ) );
+    return `<?php
+  /*
+    * Plugin Name:       ${name}
+    * Version:           1.0
+    * Author:            Html to Gutenberg
+    * Author URI:        https://www.html-to-gutenberg.io/
+    * Description:       A custom editable block built with Html to Gutenberg
+
+  */
+
+  if ( ! defined( 'ABSPATH' ) ) {
+    exit;
+  }
+
+  function ${phpPrefix}_${phpName}_add_custom_editor_styles() {
+    echo '<style>
+      .block-editor-block-types-list__list-item {
+          width: 100% !important;
+      }
+
+      .block-editor-block-list__layout.is-root-container > :where(:not(.alignleft):not(.alignright):not(.alignfull)) {
+          max-width: 100%;
+          margin: 0;
+      }
+
+      [aria-label="Empty block; start writing or type forward slash to choose a block"] {
+          max-width: 1200px !important;
+      }
+
+      span.block-editor-block-types-list__item-icon img {
+          max-width: 100%;
+          width: 100%;
+          margin: 0;
+          display: block;
+      }
+
+      span.block-editor-block-icon.has-colors {
+          width: 100%;
+          all: inherit;
+      }
+
+      span.block-editor-block-icon.has-colors svg {
+          margin-left: auto;
+          margin-right: auto;
+      }
+
+      span.block-editor-block-icon.has-colors {
+          order: 2;
+          flex: 0 0 100%;
+          width: 100%;
+      }
+
+       .block-editor-block-card {
+          display: flex !important;
+          flex-wrap: wrap;
+      }
+
+      .block-editor-inserter__preview-content-missing {
+          display: none !important;
+      }
+
+      span.block-editor-block-icon.block-editor-block-switcher__toggle.has-colors img {
+          display: none;
+      }
+          
+
+    </style>';
+  }
+
+  add_action('admin_footer', function () {
+    $screen = get_current_screen();
+    
+    if ($screen && method_exists($screen, 'is_block_editor') && $screen->is_block_editor()) {
+        $href = esc_url(plugins_url('editor.css', __FILE__));
+        echo "<link rel='stylesheet' id='${prefix}-${newName}-style' href='$href' type='text/css' media='all' />";
+    }
+});
+
+  add_action( 'enqueue_block_editor_assets', '${phpPrefix}_${phpName}_editor_assets' );
+
+  add_action('wp_enqueue_scripts', function() {
+      wp_dequeue_style('wp-fonts-local');
+      wp_deregister_style('wp-fonts-local');
+      wp_dequeue_style('global-styles');
+      wp_deregister_style('global-styles');
+      remove_action('wp_footer', 'wp_global_styles_render_svg_filters');
+  }, 100);
+
+
+  function ${phpPrefix}_${phpName}_editor_assets() {
+    $filepath = plugin_dir_path(__FILE__) . 'block.js';
+    $version = file_exists($filepath) ? filemtime($filepath) : time();
+
+    wp_enqueue_script(
+      '${prefix}-${newName}',
+      plugins_url( 'block.js', __FILE__ ),
+      array( 'wp-blocks', 'wp-components', 'wp-element' ,'wp-editor'),
+      $version
+    );
+
+    wp_localize_script( '${prefix}-${newName}', 'vars', array( 'url' => plugin_dir_url( __FILE__ ) ) );
+
+    wp_enqueue_script(
+        '${prefix}-${newName}-remote-loader',
+        plugins_url('remote-loader.js', __FILE__),
+        array(),
+        null,
+        true
+    );
+
+    wp_add_inline_script(
+      '${prefix}-${newName}-remote-loader',
+      ${JSON.stringify(inlineRemoteLoader)}
+    );
+
+    ${enqueueRemoteStyles}
+
+    ${phpPrefix}_${phpName}_add_custom_editor_styles();
+
+      wp_dequeue_style('${prefix}-${newName}-frontend');
+      wp_deregister_style('${prefix}-${newName}-frontend');
+  }
+
+  add_action('enqueue_block_editor_assets', function () {
+    wp_dequeue_style('wp-block-library');
+    wp_dequeue_style('wp-block-library-theme');
+    wp_dequeue_style('wc-block-style');
+    wp_dequeue_style('wp-format-library');
+}, 100);
+
+  add_action( 'enqueue_block_assets', '${phpPrefix}_${phpName}_block_assets' );
+
+  if (!is_admin()) {
+    wp_register_style(
+        '${prefix}-${newName}-frontend',
+        plugins_url('style.css', __FILE__)
+    );
+  }
+
+  function ${phpPrefix}_${phpName}_block_assets() {
+    
+    if ( ! is_admin() ) {
+      wp_enqueue_style('${prefix}-${newName}-frontend');
     }
 
-    `;
+    wp_enqueue_script(
+        '${prefix}-${newName}-remote-loader',
+        plugins_url('remote-loader.js', __FILE__),
+        array(),
+        null,
+        true
+    );
+
+    
+    wp_add_inline_script(
+      '${prefix}-${newName}-remote-loader',
+      ${JSON.stringify(inlineRemoteLoader)}
+    );
+  }
+  `;
+  };
+
+  function scopeCss(css, blockClass) {
+    const GLOBAL_SELECTORS = ['html', 'body', ':root', ':host', '::backdrop'];
+    const lines = css.split('\n');
+
+    let result = '';
+    const nestingStack = [];
+    let selectorBuffer = [];
+    let insidePropertyBlock = false;
+    let insideRule = false;
+    let currentIsScoped = false;
+
+    function scopeSelector(sel) {
+      sel = sel.trim();
+
+      const whereMatch = sel.match(/^([^ :]+)(:where\(.*\))$/);
+      if (whereMatch) {
+        const base = whereMatch[1];
+        const pseudo = whereMatch[2];
+        const scopedBase = scopeSelector(base);
+        return `${scopedBase}${pseudo}`;
+      }
+
+      if (sel.startsWith(':where(') && sel.endsWith(')')) {
+        const inner = sel.slice(7, -1);
+        const scopedInner = inner
+          .split(',')
+          .map(scopeSelector)
+          .join(', ');
+        return `:where(${scopedInner})`;
+      }
+
+      const isGlobal = GLOBAL_SELECTORS.some(g => sel.startsWith(g));
+      const isAlreadyScoped = sel.startsWith(blockClass) || sel.includes(` ${blockClass}`);
+
+      if (!isGlobal && !isAlreadyScoped && sel.length > 0) {
+        return `${blockClass} ${sel}`;
+      }
+      return sel;
+    }
+
+    for (const rawLine of lines) {
+      const line = rawLine.trim();
+
+      if (line.startsWith('@property')) {
+        insidePropertyBlock = true;
+        nestingStack.push('@property');
+        result += `${rawLine}\n`;
+        continue;
+      }
+
+      if (insidePropertyBlock) {
+        result += `${rawLine}\n`;
+        if (line === '}') {
+          nestingStack.pop();
+          insidePropertyBlock = false;
+        }
+        continue;
+      }
+
+      if (line.startsWith('@') && line.endsWith('{')) {
+        nestingStack.push('@block');
+        result += `${rawLine}\n`;
+        continue;
+      }
+
+      if (line === '}') {
+        if (nestingStack.length) nestingStack.pop();
+        result += `${rawLine}\n`;
+        insideRule = false;
+        currentIsScoped = false;
+        continue;
+      }
+
+      if (!insideRule && !line.startsWith('@')) {
+        selectorBuffer.push(rawLine);
+
+        if (line.endsWith('{')) {
+          insideRule = true;
+
+          const fullSelectorLine = selectorBuffer.join('\n');
+          const selectorPart = fullSelectorLine.split('{')[0];
+          const selectors = selectorPart.split(',').map(s => s.trim());
+
+          const scopedSelectors = selectors.map(scopeSelector);
+          currentIsScoped = selectors.some(sel => scopeSelector(sel) !== sel);
+
+          result += `${scopedSelectors.join(',\n')} {\n`;
+          selectorBuffer = [];
+        }
+
+        continue;
+      }
+
+      if (insideRule && line.includes(':')) {
+        const declarationMatch = line.match(/^([a-zA-Z0-9\-\_]+)\s*:\s*(.+?)(;?)$/);
+        if (declarationMatch) {
+          let [_, prop, value, semi] = declarationMatch;
+          result += `  ${prop}: ${value}${semi}\n`;
+          continue;
+        }
+      }
+
+      result += `${rawLine}\n`;
+    }
+
+    return result;
   }
 
-  const setEditor = (css: string): string => {
-    return `
-      ${editorStyles}
+  const saveFiles = async (options) => {
+    const { cssFiles = [], shouldSaveFiles, name, prefix } = options;
+    css = await parseRequirements(cssFiles);
 
-      ${css}
-    `;
-  }
+    for (const style of styles) {
+      css = style.type === 'inline' ? `
+      *:not(.components-button) { 
+        all: revert-layer; 
+      }
+        
+      ${style.content}` : `${style.content}`;
+    }
 
-  const saveFiles = async (options: BlockOptions): Promise<string> => {
-    const { cssFiles = [] } = options;
+    const scopedCssFrontend = scopeCss(css, `.wp-block-${sanitizeAndReplaceNumbers(convertName(prefix))}-${sanitizeAndReplaceNumbers(convertName(name))}`);
+    const editorStyleFile = scopeCss(css, `[data-type="${sanitizeAndReplaceNumbers(convertName(prefix))}/${sanitizeAndReplaceNumbers(convertName(name))}"]`);
+    const scriptFile = js;
+    const indexFile = getPhp(options);
+    const blockCode = await getBlock(htmlContent, options);
 
-    const css = await parseRequirements(cssFiles);
+    const blockFile = babel.transformSync(blockCode, {
+      presets: [[presetReact, { pragma: 'wp.element.createElement' }]],
+      filename: 'block.js',
+    });
 
-    saveFile('style.css', css, options);
-    saveFile('editor.css', setEditor(css), options);
+    if (shouldSaveFiles) {
+      saveFile('style.css', scopedCssFrontend, options);
+      saveFile('editor.css', editorStyleFile, options);
+      saveFile('scripts.js', scriptFile, options);
+      saveFile('index.php', indexFile, options);
+      saveFile('block.js', blockFile.code, options);
+      saveFile('remote-loader.js', '// This file intentionally left blank.', options);
+    }
 
-    saveFile('scripts.js', '', options);
-    saveFile('package.json', packageJson, options);
-    saveFile('webpack.config.js', webpackConfig, options);
-    saveFile('.babelrc', babelrc, options);
-    saveFile('index.php', getPhp(options), options);
+    return {
+      'style.css': scopedCssFrontend,
+      'editor.css': editorStyleFile,
+      'scripts.js': scriptFile,
+      'index.php': indexFile,
+      'block.js': blockFile.code,
+    }
 
-    return saveFile('block.js', (await getBlock(htmlContent, options)), options);
-  }
+  };
 
-  const logError = (error: Error): void => {
+  const logError = (error) => {
     console.error(`[Error] ${error.message}`);
-  }
+  };
 
-  const generateRandomVariableName = (prefix: string = 'content', length: number = 3): string => {
+  const generateRandomVariableName = (prefix = 'content', length = 3) => {
     let suffix = '';
-
     for (let i = 0; i < length; i++) {
       suffix += characters.charAt(
         Math.floor(Math.random() * characters.length)
       );
     }
-
     return `${prefix}${suffix}`;
-  }
+  };
+  const setAttributeContent = (randomVariableName, content) => {
+    attributes[randomVariableName] = {
+      type: 'string', default: content.replace(/(?:<[^>]*>|[^<"]*")|"/g, (match) => {
+        if (match === '"') {
+          return '&quot;';
+        }
+        return match;
+      })
+    };
+  };
 
-  const setAttributeContent = (randomVariableName: string, content: string): void => {
-    attributes[randomVariableName] = { type: 'string', default: content };
-  }
-
-  const hasAbsoluteKeyword = (str: string): boolean => {
+  const hasAbsoluteKeyword = (str) => {
     return !!(str && str.toLowerCase().includes('absolute'));
   };
 
-  const getImageTemplate = (image: Image): string => {
+  const getImageTemplate = (image) => {
     const { randomUrlVariable, randomAltVariable, imgClass } = image;
-
     return `
-      <MediaUpload 
-        onSelect={ (media) => { 
-          setAttributes({ 
-            ${randomUrlVariable}: media.url,
-            ${randomAltVariable}: media.alt
-          }); 
-        } }
-        type="image" 
-        render={ ({ open }) => (
+    <MediaUpload
+      onSelect={(media) => {
+        setAttributes({
+          ${randomUrlVariable}: media.url,
+          ${randomAltVariable}: media.alt
+        });
+      }}
+      type="image"
+      render={({ open }) => (
+        <div style={{ position: 'relative' }}>
           <img
-            src={ attributes.${randomUrlVariable} } 
-            alt={ attributes.${randomAltVariable} } 
-            onClick={ open } 
+            src={attributes.${randomUrlVariable}}
+            alt={attributes.${randomAltVariable}}
             className="${imgClass}"
-          /> 
-        )} 
-      />`
-  }
+          />
+          <div
+            onClick={open}
+            style={{
+              position: 'absolute',
+              bottom: '0',
+              width: '100%',
+              height: '100%',
+              zIndex: 10,
+            }}
+          ></div>
+        </div>
+      )}
+    />
+  `;
+  };
 
-  const replaceHtmlImage = (html: string, image: Image): string => {
+
+  const replaceHtmlImage = (html, image) => {
     const { randomUrlVariable } = image;
-    const regex = new RegExp(`(<img.*?${randomUrlVariable}.*?>)`, 'gi');
-
+    const regex = new RegExp(`<img\\s+[^>]*src=\\{[^}]*${randomUrlVariable}[^}]*\\}[^>]*>`, 'gi');
     return html.replace(regex, getImageTemplate(image));
-  }
-
-  const replaceImageComponents = (html: string): string => {
-    images.forEach((image: Image) => {
+  };
+  const replaceImageComponents = (html) => {
+    images.forEach((image) => {
       html = replaceHtmlImage(html, image);
     });
 
     return html;
-  }
-
-  const loadHtml = async (options: BlockOptions): Promise<any> => {
+  };
+  const loadHtml = async (options) => {
     const { basePath, htmlContent } = options;
-
     if (htmlContent) {
       const newHtml = await extractAssets(htmlContent, {
         basePath,
-        saveFile: false,
         verbose: false,
+        saveFile: false,
       });
-
       return cheerio.load(newHtml, {
         xmlMode: true,
         decodeEntities: false,
       });
     }
-  }
-
-  const getImageSource = (imgTag: any): string => {
+  };
+  const getImageSource = (imgTag) => {
     return imgTag.attr('src') || '';
-  }
-
-  const getImageAlt = (imgTag: any): string => {
+  };
+  const getImageAlt = (imgTag) => {
     return imgTag.attr('alt') || '';
-  }
-
-  const getParentElement = (imgTag: any): any => {
+  };
+  const getParentElement = (imgTag) => {
     return imgTag.parent();
-  }
-
-  const getImageStyle = (imgTag: any): string => {
-    return imgTag.attr('style') || ''
-  }
-
-  const getImageClass = (imgTag: any): string => {
-    return imgTag.attr('class') || imgTag.attr('className') || ''
-  }
-
-  const getPreviousStyle = (parentElement: any): string => {
-    return parentElement.attr('style') || ''
-  }
-
-  const getParentClass = (parentElement: any): string => {
+  };
+  const getImageStyle = (imgTag) => {
+    return imgTag.attr('style') || '';
+  };
+  const getImageClass = (imgTag) => {
+    return imgTag.attr('class') || imgTag.attr('className') || '';
+  };
+  const getPreviousStyle = (parentElement) => {
+    return parentElement.attr('style') || '';
+  };
+  const getParentClass = (parentElement) => {
     return parentElement.attr('class') || parentElement.attr('className') || '';
-  }
-
-  const isBackgroundImage = (imgStyle: string, imgClass: string, previousStyle: string, previousClass: string): boolean => {
-    return hasAbsoluteKeyword(imgStyle) || hasAbsoluteKeyword(imgClass) || hasAbsoluteKeyword(previousStyle) || hasAbsoluteKeyword(previousClass);
-  }
-
-  const getImageProperties = (imgTag: any): ImageProperties => {
+  };
+  const isBackgroundImage = (
+    imgStyle,
+    imgClass,
+    previousStyle,
+    previousClass
+  ) => {
+    return (
+      hasAbsoluteKeyword(imgStyle) ||
+      hasAbsoluteKeyword(imgClass) ||
+      hasAbsoluteKeyword(previousStyle) ||
+      hasAbsoluteKeyword(previousClass)
+    );
+  };
+  const getImageProperties = (imgTag) => {
     const parentElement = getParentElement(imgTag);
     const imgStyle = getImageStyle(imgTag);
     const imgClass = getImageClass(imgTag);
     const previousStyle = getPreviousStyle(parentElement);
     const previousClass = getParentClass(parentElement);
-    const isBackground = isBackgroundImage(imgStyle, imgClass, previousStyle, previousClass);
-
+    const isBackground = isBackgroundImage(
+      imgStyle,
+      imgClass,
+      previousStyle,
+      previousClass
+    );
     return {
       imgTag,
       imgClass,
@@ -326,161 +639,163 @@ const block = async (htmlContent: string, options: BlockOptions = { name: 'My bl
       imgSrc: getImageSource(imgTag),
       imgAlt: getImageAlt(imgTag),
     };
-  }
-
-  const setImageAttribute = (properties: ImageProperties): string => {
+  };
+  const setImageAttribute = (properties) => {
     const { imgTag, imgSrc, imgAlt, attribute, type, prefix } = properties;
     const newPrefix = prefix ? convertName(prefix) : 'wp';
-
     const randomVariable = generateRandomVariableName(`${type}${newPrefix}`);
-
     attributes[randomVariable] = {
       attribute,
       type: 'string',
       selector: 'img',
       default: attribute === 'alt' ? imgAlt : `var.url+'${imgSrc}'`,
     };
-
     imgTag.attr(attribute, `{attributes.${randomVariable}}`);
-
     return randomVariable;
-  }
-
-  const processImage = (properties: ImageProperties): void => {
+  };
+  const processImage = (properties) => {
     const { imgClass, type } = properties;
-
-    const randomUrlVariable = setImageAttribute({ ...properties, attribute: 'src', prefix: 'Url' });
-    const randomAltVariable = setImageAttribute({ ...properties, attribute: 'alt', prefix: 'Alt' });
-
+    const randomUrlVariable = setImageAttribute({
+      ...properties,
+      attribute: 'src',
+      prefix: 'Url',
+    });
+    const randomAltVariable = setImageAttribute({
+      ...properties,
+      attribute: 'alt',
+      prefix: 'Alt',
+    });
     if (type !== 'background') {
       images.push({ randomUrlVariable, randomAltVariable, imgClass });
-
       return;
     }
-
     createPanel({
       type: 'media',
       title: 'Background Image',
       attributes: [randomUrlVariable, randomAltVariable],
     });
-  }
-
-  const getFixedHtml = (html: string): string => {
-    return html.replace(/ onChange="{" \(newtext\)=""\>/gi, ' onChange={ (newtext) => ').replace(/\<\/RichText\>/gi, '').replace(/value="{(.*?)}"/gi, 'value={$1}').replace(/"{attributes.(.*?)}"/gi, '{attributes.$1}');
-  }
-
-  const processImages = (imgTag: any): void => {
+  };
+  const getFixedHtml = (html) => {
+    return html
+      .replace(/ onChange="{" \(newtext\)=""\>/gi, ' onChange={ (newtext) => ')
+      .replace(/\<\/RichText\>/gi, '')
+      .replace(/value="{(.*?)}"/gi, 'value={$1}')
+      .replace(/"{attributes.(.*?)}"/gi, '{attributes.$1}');
+  };
+  const processImages = (imgTag) => {
     const properties = getImageProperties(imgTag);
     const { isBackground } = properties;
-
     if (!isBackground) {
       processImage({ ...properties, type: 'image' });
       return;
     }
-
     processImage({ ...properties, type: 'background' });
-  }
-
-  const loopImages = ($: any): void => {
-    $('img').each((_index: any, img: any): void => {
+  };
+  const loopImages = ($) => {
+    $('img').each((_index, img) => {
       processImages($(img));
     });
-  }
-
-  const getHtml = ($: any): string => {
+  };
+  const getHtml = ($) => {
     return $.html({ xml: false, decodeEntities: false });
-  }
-
-  const processEditImages = async (options: BlockOptions): Promise<string> => {
+  };
+  const processEditImages = async (options) => {
     const $ = await loadHtml(options);
-
     loopImages($);
-
     return replaceImageComponents(getFixedHtml(getHtml($)));
-  }
-
-  const getRichTextTemplate = (randomVariable: string, variableContent: string): string => {
+  };
+  const getRichTextTemplate = (randomVariable, variableContent) => {
     return `
     ><RichText 
       tagName="span"
       value={attributes.${randomVariable}} 
-      default="${variableContent.trim()}" 
+      default="${variableContent.trim().replace(/"/g, '&quot;')}"
       onChange={ (newtext) => {
         setAttributes({ ${randomVariable}: newtext });
       }}
     /><`;
-  }
-
-  const convertToRichText = (variableContent: string): string => {
+  };
+  const convertToRichText = (variableContent) => {
     const randomVariable = generateRandomVariableName('content');
-
     setAttributeContent(randomVariable, variableContent);
-
     return getRichTextTemplate(randomVariable, variableContent);
-  }
-
-  const parseContent = (content: string): string => {
+  };
+  const parseContent = (content) => {
     return content.replace(/>([^<]+)</g, (match, variableContent) => {
       if (match.replace(/\s\S/g, '').replace(/(<|>)/g, '').trim() === '') {
         return match;
       }
-
       return convertToRichText(variableContent);
     });
-  }
-
-  const editJsxContent = async (options: BlockOptions): Promise<string> => {
+  };
+  const editJsxContent = async (options) => {
     let content;
-
     if (options.htmlContent) {
-      content = options.htmlContent.replaceAll(/<!--(.*?)-->/sg, '');
+      content = options.htmlContent.replaceAll(/<!--(.*?)-->/gs, '');
     }
-
-    content = `<div>${content}</div>`;
-
-    return await processEditImages({ ...options, htmlContent: convert(parseContent(content)) });
-  }
-
-  const createPanel = (values: Panel): void => {
+    content = `<div className="custom-block">${content}</div>`;
+    return await processEditImages({
+      ...options,
+      htmlContent: convert(parseContent(content)),
+    });
+  };
+  const createPanel = (values) => {
     if (values.attributes && values.attributes.length > 0) {
       panels.push(values);
     }
-  }
-
-  const getSvgTemplate = (_match: string, group1: string, group3: string, randomSVGVariable: string): string => {
+  };
+  const getSvgTemplate = (_match, group1, group3, randomSVGVariable) => {
     return `
       <svg
         ${group1}
-          dangerouslySetInnerHTML={ { __html: attributes.${randomSVGVariable} }}
+        dangerouslySetInnerHTML={ { __html: attributes.${randomSVGVariable} }}
         >
       ${group3}
       `;
-  }
+  };
+  const replaceSVGImages = async (html) => {
+    const regex = /<\s*svg\b((?:[^>'"]|"[^"]*"|'[^']*')*)>(\s*(?:[^<]|<(?!\/svg\s*>))*)(<\/\s*svg\s*>)/gim;
 
-  const replaceSVGImages = (html: string): string => {
-    return html.replace(/<\s*svg\b((?:[^>'"]|"[^"]*"|'[^']*')*)>(\s*(?:[^<]|<(?!\/svg\s*>))*)(<\/\s*svg\s*>)/gim, (match: string, group1: string, group2: string, group3: string): string => {
+    let result = '';
+    let lastIndex = 0;
+    const matches = [...html.matchAll(regex)];
+
+    for (const match of matches) {
+      const [fullMatch, group1, group2, group3] = match;
+      const start = match.index;
+      const end = start + fullMatch.length;
+
+      result += html.slice(lastIndex, start);
+
       const content = group2.trim();
-
       if (content) {
         const randomSVGVariable = generateRandomVariableName('svg');
-
         setAttributeContent(randomSVGVariable, content);
-
         createPanel({
           type: 'svg',
           title: 'SVG Markup',
-          attributes: [randomSVGVariable]
-        })
+          attributes: [randomSVGVariable],
+        });
 
-        return getSvgTemplate(match, group1, group3, randomSVGVariable);
+        const replacement = await transform(
+          getSvgTemplate(fullMatch, group1, group3, randomSVGVariable),
+          { jsxRuntime: 'classic' }
+        );
+
+        result += replacement;
+      } else {
+        result += fullMatch;
       }
 
-      return match;
-    });
-  }
+      lastIndex = end;
+    }
 
-  const getSvgPanelTemplate = (panel: Panel): string => {
-    return panel.attributes && attributes[panel.attributes] ? `
+    result += html.slice(lastIndex);
+    return result;
+  };
+  const getSvgPanelTemplate = (panel) => {
+    return panel.attributes && attributes[panel.attributes]
+      ? `
     { (            
     <PanelBody title="${panel.title}">
       <PanelRow>
@@ -497,15 +812,20 @@ const block = async (htmlContent: string, options: BlockOptions = { name: 'My bl
       </PanelRow>
     </PanelBody>
     )}
-  ` : '';
+  `
+      : '';
+  };
 
-  }
-
-  const getMediaPanelTemplate = (panel: Panel): string => {
-    const mediaAtts = panel.attributes?.[0] && panel.attributes[1] ? `${panel.attributes[0]}: media.url,
-                   ${panel.attributes[1]}: media.alt` : '';
-
-    return panel.attributes && panel.attributes[0] && attributes[panel.attributes[0]] ? `              
+  const getMediaPanelTemplate = (panel) => {
+    const mediaAtts =
+      panel.attributes?.[0] && panel.attributes[1]
+        ? `${panel.attributes[0]}: media.url,
+                   ${panel.attributes[1]}: media.alt`
+        : '';
+    return panel.attributes &&
+      panel.attributes[0] &&
+      attributes[panel.attributes[0]]
+      ? `              
       <PanelBody title="${panel.title}">
         <PanelRow>
           <div>
@@ -518,7 +838,7 @@ const block = async (htmlContent: string, options: BlockOptions = { name: 'My bl
               type="image"
               value={ attributes.${panel.attributes?.[0]} }
               render={({ open }) => (
-                  <button onClick={ open }>Select Image</button>
+                  <Button variant="secondary" style={{ marginBottom: "20px" }} onClick={ open }>Select Image</Button>
               )}
             />
             {attributes.${panel.attributes?.[0]} && (
@@ -527,10 +847,11 @@ const block = async (htmlContent: string, options: BlockOptions = { name: 'My bl
           </div>
         </PanelRow>
       </PanelBody>
-      ` : '';
-  }
+      `
+      : '';
+  };
 
-  const getPanelTemplate = (panel: Panel): string => {
+  const getPanelTemplate = (panel) => {
     switch (panel.type) {
       case 'svg':
         return getSvgPanelTemplate(panel);
@@ -539,101 +860,152 @@ const block = async (htmlContent: string, options: BlockOptions = { name: 'My bl
       default:
         return '';
     }
-  }
+  };
 
-  const getPanelsTemplate = (): string => {
-    return panels.map((panel: Panel) => {
-      return getPanelTemplate(panel);
-    }).join('\n');
-  }
+  const getPanelsTemplate = () => {
+    return panels
+      .map((panel) => {
+        return getPanelTemplate(panel);
+      })
+      .join('\n');
+  };
 
-  const createPanels = (): string => {
+  const createPanels = () => {
     return `
     <Panel>
       ${getPanelsTemplate()}
     </Panel>`;
-  }
+  };
 
-  const getSaveContent = (editContent: string): string => {
-    return editContent.replace(/<RichText((.|\n)*?)value=\{(.*?)\}((.|\n)*?)\/>/gi, '<RichText.Content value={$3} />');
-  }
+  const getSaveContent = (editContent) => {
+    return editContent.replace(
+      /<RichText((.|\n)*?)value=\{(.*?)\}((.|\n)*?)\/>/gi,
+      '<RichText.Content value={$3} />'
+    );
+  };
 
-  const saveHtmlContent = (editContent: string): string => {
+  const saveHtmlContent = (editContent) => {
     return getSaveContent(editContent).replace(/className=/gi, 'class=');
-  }
+  };
 
-  const removeHref = (match: string): string => {
+  const removeHref = (match) => {
     return match.replace(/href="(.*?)"/, '');
-  }
+  };
+  const replaceRichText = (match, group1, _group2, group3) => {
+    return removeHref(match)
+      .replace(group1, '<span')
+      .replace(group3, '</span>');
+  };
+  const processLinks = (options) => {
+    let htmlContent = options.htmlContent
+      ? options.htmlContent.replace(
+        /(<a)[^>]*>([\s\S]*?)(<\/a>)/gim,
+        replaceRichText
+      )
+      : undefined;
 
-  const replaceRichText = (match: string, group1: string, _group2: string, group3: string): string => {
-    return removeHref(match).replace(group1, '<span').replace(group3, '</span>');
-  }
-
-  const processLinks = (options: BlockOptions): BlockOptions => {
-    const htmlContent = options.htmlContent ? options.htmlContent.replace(/(<a)[^>]*>([\s\S]*?)(<\/a>)/gim, replaceRichText) : undefined;
+    htmlContent = unwrapAnchor(htmlContent);
 
     return {
       ...options,
       htmlContent,
-    }
-  }
+    };
+  };
 
-  const transformOnClickEvent = (img: string): string => {
+  const unwrapAnchor = (htmlContent) => {
+    return htmlContent.replace(
+      /<span([^>]*)>\s*<a([^>]*)>(.*?)<\/a>\s*<\/span>/gi,
+      (_, spanAttrs, anchorAttrs, content) => {
+        const allAttrs = {};
+        const attrRegex = /(\S+)=["'](.*?)["']/g;
+
+        let match;
+        while ((match = attrRegex.exec(spanAttrs)) !== null) {
+          allAttrs[match[1]] = match[2];
+        }
+
+        while ((match = attrRegex.exec(anchorAttrs)) !== null) {
+          allAttrs[match[1]] = match[2];
+        }
+
+        return `<a ${Object.entries(allAttrs)
+          .map(([key, value]) => `${key}="${value}"`)
+          .join(' ')}>${content}</a>`;
+      }
+    );
+  };
+
+  const transformOnClickEvent = (img) => {
     return img.replace(/onClick={[^}]+}\s*/, '');
-  }
+  };
 
-  const processSaveImages = (htmlString: string) => {
-    return htmlString.replace(/<MediaUpload\b[^>]*>([\s\S]*?(<img\b[^>]*>*\/>)[\s\S]*?)\/>/g, (_match, _attributes, img) => transformOnClickEvent(img));
-  }
+  const processSaveImages = (htmlString) => {
+    return htmlString.replace(
+      /<MediaUpload\b[^>]*>([\s\S]*?(<img\b[^>]*>*\/>)[\s\S]*?)\/>/g,
+      (_match, _attributes, img) => transformOnClickEvent(img)
+    );
+  };
 
-  const getComponentAttributes = (): string => {
+  const getComponentAttributes = () => {
     return JSON.stringify(attributes, null, 2);
-  }
+  };
 
-  const getEdit = async (options: BlockOptions): Promise<string> => {
-    let { htmlContent } = options
+  const getEdit = async (options) => {
+    let { htmlContent } = options;
 
     if (htmlContent) {
-      htmlContent = await editJsxContent(processLinks(options))
-      return replaceSVGImages(htmlContent);
+      htmlContent = await editJsxContent(processLinks(options));
+      return (await replaceSVGImages(htmlContent.replaceAll('../', '').replace(/style="([^"]+)"/g, (_, styleString) => {
+        const styleObj = parseStyleString(styleString);
+        return `style={${styleObj}}`;
+      })));
     }
-
     return '';
-  }
-
-  const getSave = (edit: string): string => {
+  };
+  const getSave = (edit) => {
     return processSaveImages(saveHtmlContent(edit));
-  }
-
-  const getBlock = async (htmlContent: string, settings: BlockOptions): Promise<string> => {
-    let { prefix, name, category, generateIconPreview, basePath, cssFiles, jsFiles } = settings;
+  };
+  const getBlock = async (htmlContent, settings) => {
+    let {
+      prefix,
+      name,
+      category,
+      generateIconPreview,
+      basePath,
+      cssFiles,
+      jsFiles,
+    } = settings;
     const newName = convertName(name);
     const newPrefix = convertName(prefix);
-
     cssFiles = cssFiles || [];
     jsFiles = jsFiles || [];
-
-    let iconPreview = '\'shield\'';
+    let iconPreview = "'shield'";
     let edit = await getEdit(settings);
-    edit = edit.replace(/dangerouslySetInnerHTML="{" {="" __html:="" (.*?)="" }}=""/gm, `dangerouslySetInnerHTML={{ __html: $1 }}`);
+    edit = edit.replace(
+      /dangerouslySetInnerHTML="{" {="" __html:="" (.*?)="" }}=""/gm,
+      `dangerouslySetInnerHTML={{ __html: $1 }}`
+    );
     const save = getSave(edit);
     const blockPanels = createPanels();
-    const blockAttributes = `${JSON.parse(JSON.stringify(getComponentAttributes(), null, 2)).replace(/"var.url\+\'(.*?)\'(.*?)"/g, 'vars.url+\'$1\'$2')}`;
-
+    const blockAttributes = `${JSON.parse(
+      JSON.stringify(getComponentAttributes(), null, 2)
+    ).replace(/"var.url\+\'(.*?)\'(.*?)"/g, "vars.url+'$1'$2").replaceAll("var(.*?).url\+'(http.*?)'", 'http$2')}`;
     if (generateIconPreview) {
       try {
-        await icon(htmlContent, { basePath, cssFiles, jsFiles })
-        iconPreview = `(<img src="data:image/jpeg;base64,${await imageToBase64(path.join(basePath, 'preview.jpeg'))}" />)`;
-      } catch (error: any) {
+        await icon(htmlContent, { basePath, cssFiles, jsFiles });
+        iconPreview = `(<img src="data:image/jpeg;base64,${await imageToBase64(
+          path.join(basePath, 'preview.jpeg')
+        )}" />)`;
+      } catch (error) {
         console.log(`There was an error generating preview. ${error.message}`);
       }
     }
     const output = `
+    (function () {
         ${imports}
 
-        registerBlockType('${newPrefix}/${newName}', {
-            title: '${newName}',
+        registerBlockType('${sanitizeAndReplaceNumbers(newPrefix)}/${sanitizeAndReplaceNumbers(newName)}', {
+            title: '${name}',
             icon: ${iconPreview},
             category: '${category}',
             attributes: ${blockAttributes},
@@ -658,36 +1030,90 @@ const block = async (htmlContent: string, options: BlockOptions = { name: 'My bl
             );
             },
         });
-        `;
-
+        })();`;
     if (generateIconPreview) {
       return output.replace(/icon: \s * (')([^']*)(')/, 'icon: $2');
     }
-
     return output;
-  }
+  };
+  const setupVariables = async (htmlContent, options) => {
+    const styleRegex = /<style[^>]*>([\s\S]*?)<\/style>/gi;
+    const linkRegex = /<link\s+[^>]*href=["']([^"']+)["'][^>]*>/gi;
 
-  const setupVariables = async (htmlContent: string, options: BlockOptions): Promise<any> => {
-    let { basePath = process.cwd(), cssFiles = [], jsFiles = [], name = 'My block' } = options;
+    let match;
 
+    htmlContent = htmlContent.replace(styleRegex, (_fullMatch, cssContent) => {
+      styles.push({ type: 'inline', content: cssContent.trim() });
+      return '';
+    });
+
+    const fetchCssPromises = [];
+    while ((match = linkRegex.exec(htmlContent)) !== null) {
+      const url = match[1];
+      const fetchCssPromise = fetch(url)
+        .then((response) => response.text())
+        .then((css) => styles.push({ type: 'external', content: css }))
+        .catch(() => console.warn(`Failed to fetch: ${url}`));
+      fetchCssPromises.push(fetchCssPromise);
+    }
+
+    htmlContent = htmlContent.replace(linkRegex, '');
+
+    await Promise.all(fetchCssPromises);
+
+    css = styles.map((style) => {
+      return `${style.content}`;
+    }).join('\n');
+
+    const scriptRegex = /<script[^>]*>([\s\S]*?)<\/script>/gi;
+    const scriptSrcRegex =
+      /<script\s+[^>]*src=["']([^"']+)["'][^>]*>\s*<\/script>/gi;
+
+    let jsMatch;
+
+    htmlContent = htmlContent.replace(scriptRegex, (_fullMatch, jsContent) => {
+      if (jsContent.trim()) {
+        scripts.push({ type: 'inline', content: jsContent });
+      }
+      return '';
+    });
+
+    const fetchJsPromises = [];
+    while ((jsMatch = scriptSrcRegex.exec(htmlContent)) !== null) {
+      const url = jsMatch[1];
+      const fetchJsPromise = fetch(url)
+        .then((response) => response.text())
+        .then((js) => scripts.push({ type: 'external', content: js }))
+        .catch(() => console.warn(`Failed to fetch script: ${url}`));
+      fetchJsPromises.push(fetchJsPromise);
+    }
+
+    htmlContent = htmlContent.replace(scriptSrcRegex, '');
+
+    await Promise.all(fetchJsPromises);
+
+    js = scripts.map((script) => script.content).join('\n');
+
+    let {
+      basePath = process.cwd(),
+      cssFiles = [],
+      jsFiles = [],
+      name = 'My block',
+    } = options;
     const newDir = path.join(basePath, convertName(name));
-
     try {
       fs.mkdirSync(newDir, { recursive: true });
-
       return {
         ...options,
         jsFiles,
         cssFiles,
         htmlContent,
-        basePath: newDir
-      }
-    } catch (error: any) {
+        basePath: newDir,
+      };
+    } catch (error) {
       logError(error);
     }
-  }
-
+  };
   return saveFiles(await setupVariables(htmlContent, options));
-}
-
+};
 export default block;
