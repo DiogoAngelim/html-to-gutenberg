@@ -53,94 +53,124 @@ const block = async (
       return jsFiles.some(url => tailwindCdnRegex.test(url));
   }
   
-  function parseStyleString(style) {
-    const entries = style.split(';').filter(Boolean).map(rule => {
-      const [key, value] = rule.split(':');
-      
-      if (!key || !value) return null;
+  function parseInlineStyle(styleString) {
+    if (!styleString || typeof styleString !== 'string') return '';
   
-      const camelKey = key.trim().replace(/-([a-z])/g, (_, char) => char.toUpperCase());
+    const styleEntries = styleString
+      .split(';')
+      .map(rule => rule.trim())
+      .filter(Boolean)
+      .map(rule => {
+        const [property, value] = rule.split(':').map(part => part.trim());
+  
+        if (!property || !value) return null;
+  
+        const camelCasedProperty = property.replace(/-([a-z])/g, (_, char) => char.toUpperCase());
+  
+        return [camelCasedProperty, value];
+      })
+      .filter(Boolean);
+  
+    const styleObject = Object.fromEntries(styleEntries);
+  
+    return JSON.stringify(styleObject).replace(/"([^"]+)":/g, '$1:');
+  }
 
-      return [camelKey, value.trim()];
-    }).filter(Boolean);
-  
-    const styleObject = Object.fromEntries(entries);
-  
-    return JSON.stringify(styleObject).replace(/"([^"]+)":/g, '$1:'); 
-  } 
-
-  function sanitizeAndReplaceLeadingNumbers(str) {
+  function sanitizeAndReplaceLeadingNumbers(input) {
     const numberWords = ['zero', 'one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine'];
-    let firstNumberReplaced = false;
+    let hasReplacedFirstNumber = false;
   
-    return str
+    return input
       .toLowerCase()
       .replace(/[\s\-_]/g, '')
       .replace(/\d/g, (digit) => {
-        if (!firstNumberReplaced) {
-          firstNumberReplaced = true;
-
-          return numberWords[parseInt(digit)] + digit;
-        }
-        return digit;
+        if (hasReplacedFirstNumber) return digit;
+  
+        hasReplacedFirstNumber = true;
+        return numberWords[parseInt(digit)] + digit;
       })
       .replace(/^[^a-z]+/, '');
-  }
+  }  
    
-  const replaceUnderscoresSpacesAndUppercaseLetters = (name = '') => {
-    return name.replace(new RegExp(/\W|_/, 'g'), '-').toLowerCase();
+  const replaceUnderscoresSpacesAndUppercaseLetters = (input = '') => {
+    const nonWordOrUnderscore = /\W|_/g;
+    return input.replace(nonWordOrUnderscore, '-').toLowerCase();
+  };  
+
+  const buildFilePath = (basePath, fileName) => {
+    return path.join(basePath, fileName);
   };
+  
+  const writeFile = (filePath, data) => {
+    fs.writeFileSync(filePath, data);
+  };  
 
   const saveFile = (fileName, contents, options) => {
     try {
-      const filePath = path.join(options.basePath, fileName);
-      
-      fs.writeFileSync(filePath, contents);
-      
+      const filePath = buildFilePath(options.basePath, fileName);
+      writeFile(filePath, contents);
       return contents;
     } catch (error) {
       logError(error);
     }
-  };
+  };  
 
-  function replaceRelativeUrls(html, replacer) {
-    const urlAttributes = [
-      'src', 'href', 'action', 'srcset', 'poster', 'data', 'formaction'
+  function buildRelativeUrlRegex() {
+    const attributes = [
+      'src',
+      'href',
+      'action',
+      'srcset',
+      'poster',
+      'data',
+      'formaction'
     ];
   
-    const regex = new RegExp(
-      `\\b(${urlAttributes.join('|')}|data-[a-zA-Z0-9_-]+)\\s*=\\s*(['"])(?!https?:|//|mailto:|tel:|#)([^'"]+)\\2`,
+    const protocolsToIgnore = ['https?:', '//', 'mailto:', 'tel:', '#'].join('|');
+  
+    return new RegExp(
+      `\\b(${attributes.join('|')}|data-[a-zA-Z0-9_-]+)\\s*=\\s*(['"])(?!${protocolsToIgnore})([^'"]+)\\2`,
       'gi'
     );
-  
-    return html.replace(regex, (_match, attr, quote, url) => {
-      const newUrl = replacer(url);
-      return `${attr}=${quote}${newUrl}${quote}`;
-    });
   }
   
+  function replaceRelativeUrls(html, replacer) {
+    const regex = buildRelativeUrlRegex();
+    return html.replace(regex, (_match, attribute, quote, url) => {
+      const updatedUrl = replacer(url);
+      return `${attribute}=${quote}${updatedUrl}${quote}`;
+    });
+  }
+
+  function getRelativeUrlCssRegex() {
+    const ignoredProtocols = ['https?:', '//', 'data:', 'mailto:', 'tel:', '#'].join('|');
+    return new RegExp(
+      `url\\(\\s*(['"]?)(?!${ignoredProtocols})([^'")]+)\\1\\s*\\)`,
+      'gi'
+    );
+  }  
 
   function replaceRelativeUrlsInCss(css, replacer) {
-    const regex = /url\(\s*(['"]?)(?!https?:|\/\/|data:|mailto:|tel:|#)([^'")]+)\1\s*\)/gi;
+    const regex = getRelativeUrlCssRegex();
   
-    return css.replace(regex, (match, quote, url) => {
-      const newUrl = replacer(url);
-      return `url(${quote}${newUrl}${quote})`;
+    return css.replace(regex, (_match, quote, url) => {
+      const updatedUrl = replacer(url);
+      return `url(${quote}${updatedUrl}${quote})`;
     });
+  }
+
+  function resolveUrl(relativePath, baseUrl) {
+    return new URL(relativePath, baseUrl).href;
   }
   
   function replaceRelativeUrlsInHtml(html, baseUrl) {
-    return replaceRelativeUrls(html, (url) => {
-      return new URL(url, baseUrl).href;
-    });
+    return replaceRelativeUrls(html, (url) => resolveUrl(url, baseUrl));
   }
-
+  
   function replaceRelativeUrlsInCssWithBase(css, cssFileUrl) {
-    return replaceRelativeUrlsInCss(css, (url) => {
-      return new URL(url, cssFileUrl).href;
-    });
-  }  
-
+    return replaceRelativeUrlsInCss(css, (url) => resolveUrl(url, cssFileUrl));
+  }
+  
   const parseRequirements = async (files, options) => {
     const { source } = options;
     let output = '';
@@ -168,13 +198,14 @@ const block = async (
     return output;
   };
 
-  const convertDashesSpacesAndUppercaseToUnderscoresAndLowercase = (string) => {
-    if (string) {
-      return `${string.replaceAll('-', '_').replaceAll(' ', '_').toLowerCase()}`;
-    }
-
-    return '';
-  };
+  const convertDashesSpacesAndUppercaseToUnderscoresAndLowercase = (input = '') => {
+    if (!input) return '';
+  
+    return input
+      .replaceAll('-', '_')
+      .replaceAll(' ', '_')
+      .toLowerCase();
+  };  
 
   const newName = replaceUnderscoresSpacesAndUppercaseLetters(name);
   const blockName = `${sanitizeAndReplaceLeadingNumbers(replaceUnderscoresSpacesAndUppercaseLetters(prefix))}/${sanitizeAndReplaceLeadingNumbers(replaceUnderscoresSpacesAndUppercaseLetters(name))}`;
@@ -389,12 +420,14 @@ const block = async (
   `;
   };
 
-  function transformBlockFile(blockCode) {
-    return babel.transformSync(blockCode, {
+  function transformBlockFile(code) {
+    const transformOptions = {
       presets: [[presetReact, { pragma: 'wp.element.createElement' }]],
-      filename: 'block.js'
-    });
-  }
+      filename: 'block.js',
+    };
+  
+    return babel.transformSync(code, transformOptions);
+  }  
   
   const saveFiles = async (options) => {
     const { cssFiles = [], jsFiles = [], shouldSaveFiles, name, prefix } = options;
@@ -464,7 +497,7 @@ const block = async (
     return `${prefix}${suffix}`;
   };
 
-  const functionSufix = generateRandomVariableName('func');
+  const functionSufix = generateRandomVariableName('func', 6);
 
   const setRandomAttributeContent = (randomVariableName, content) => {
     let newContent = content;
@@ -741,25 +774,31 @@ const block = async (
   };
 
   const getFixedHtml = (html) => {
+    const onChangeRegex = / onChange="{" \(newtext\)=""\>/gi;
+    const closeRichTextRegex = /<\/RichText>/gi;
+    const valueBindingRegex = /value="{(.*?)}"/gi;
+    const attributeBindingRegex = /"{attributes\.(.*?)}"/gi;
+    
+    const fixOnChange = ' onChange={ (newtext) => ';
+    const fixValueBinding = 'value={$1}';
+    const fixAttributeBinding = '{attributes.$1}';
+
     return html
-      .replace(/ onChange="{" \(newtext\)=""\>/gi, ' onChange={ (newtext) => ')
-      .replace(/\<\/RichText\>/gi, '')
-      .replace(/value="{(.*?)}"/gi, 'value={$1}')
-      .replace(/"{attributes.(.*?)}"/gi, '{attributes.$1}');
+      .replace(onChangeRegex, fixOnChange)
+      .replace(closeRichTextRegex, '')
+      .replace(valueBindingRegex, fixValueBinding)
+      .replace(attributeBindingRegex, fixAttributeBinding);
   };
+  
 
   const processImages = (imgTag) => {
     const properties = getImageProperties(imgTag);
-    const { isBackground } = properties;
-
-    if (!isBackground) {
-      processImage({ ...properties, type: 'image' });
-
-      return;
-    }
-
-    processImage({ ...properties, type: 'background' });
+    const type = properties.isBackground ? 'background' : 'image';
+  
+    processImage({ ...properties, type });
   };
+
+  
   const loopImages = ($) => {
     $('img').each((_index, img) => {
       processImages($(img));
@@ -795,91 +834,138 @@ const block = async (
     return getRichTextTemplate(randomVariable, variableContent);
   };
 
-  const parseContent = (content) => {
-    return content.replace(/>([^<]+)</g, (match, variableContent) => {
-      const regex = /{|}|\(|\)|=>/;
-
-      if (regex.test(variableContent.trim())) {
-        return match;
-      }
-  
-      if (variableContent.trim() === '') {
-        return match;
-      }
-  
-      return convertToRichText(variableContent);
-    });
+  const containsCodeSyntax = (text) => {
+    const codePattern = /{|}|\(|\)|=>/;
+    return codePattern.test(text.trim());
   };
   
-  const getEditJsxContent = async (options) => {    
-    let content = transformFormToDynamicJSX(htmlContent);
+  const isEmptyText = (text) => {
+    return text.trim() === '';
+  };
 
-    content = content.replaceAll(/<!--(.*?)-->/gs, '');
+  const parseContent = (content) => {
+    return content.replace(/>([^<]+)</g, (match, text) => {
+      const hasCodeSyntax = containsCodeSyntax(text);
+      const isEmpty = isEmptyText(text);
+  
+      if (hasCodeSyntax || isEmpty) {
+        return match;
+      }
+  
+      return convertToRichText(text);
+    });
+  };
 
-    content = `<div className="custom-block">${content}</div>`;
-
+  const removeHtmlComments = (html) => {
+    return html.replaceAll(/<!--(.*?)-->/gs, '');
+  };
+  
+  const wrapWithContainer = (html) => {
+    return `<div className="custom-block">${html}</div>`;
+  };
+    
+  const getEditJsxContent = async (options) => {
+    const dynamicContent = transformFormToDynamicJSX(htmlContent);
+    const withoutComments = removeHtmlComments(dynamicContent);
+    const wrappedContent = wrapWithContainer(withoutComments);
+  
+    const parsedContent = convert(parseContent(wrappedContent));
+  
     return await processEditImages({
       ...options,
-      htmlContent: convert(parseContent(content)),
+      htmlContent: parsedContent,
     });
   };
+  
+  const hasAttributes = (panel) => {
+    return Array.isArray(panel.attributes) && panel.attributes.length > 0;
+  };  
 
-  const createPanel = (values) => {
-    if (values.attributes && values.attributes.length > 0) {
-      panels.push(values);
-    }
+  const createPanel = (panel) => {
+    if (!hasAttributes(panel)) return;
+  
+    panels.push(panel);
   };
 
-  const getSvgTemplate = (_match, group1, group3, randomSVGVariable) => {
+  const getSvgTemplate = (_match, attributesString, closingTag, variableName) => {
     return `
       <svg
-        ${group1}
-        dangerouslySetInnerHTML={ { __html: attributes.${randomSVGVariable} }}
-        >
-      ${group3}
+        ${attributesString}
+        dangerouslySetInnerHTML={{ __html: attributes.${variableName} }}
+      >
+      ${closingTag}
       `;
   };
-  const replaceSVGImages = async (html) => {
-    const regex = /<\s*svg\b((?:[^>'"]|"[^"]*"|'[^']*')*)>(\s*(?:[^<]|<(?!\/svg\s*>))*)(<\/\s*svg\s*>)/gim;
+
+  const findSVGMatches = (html) => {
+    const svgRegex = /<\s*svg\b((?:[^>'"]|"[^"]*"|'[^']*')*)>(\s*(?:[^<]|<(?!\/svg\s*>))*)(<\/\s*svg\s*>)/gim;
+    return [...html.matchAll(svgRegex)];
+  };
   
-    let result = '';
-    let lastIndex = 0;
-    const matches = [...html.matchAll(regex)];
+  const parseSVGMatch = (match) => {
+    const [fullSvg, attributes, content, closingTag] = match;
+    const start = match.index;
+    const end = start + fullSvg.length;
+  
+    return { fullSvg, attributes, content, closingTag, start, end };
+  };
+  
+  const hasContent = (content) => content.trim() !== '';
+  
+  const handleSVGContent = (content) => {
+    const variableName = generateRandomVariableName('svg');
+    const cleanedContent = content.replaceAll('className', 'class');
+  
+    setRandomAttributeContent(variableName, cleanedContent);
+  
+    createPanel({
+      type: 'svg',
+      title: 'SVG Markup',
+      attributes: [variableName],
+    });
+  
+    return variableName;
+  };
+  
+  const transformSVG = async (fullSvg, attributes, closingTag, variableName) => {
+    const template = getSvgTemplate(fullSvg, attributes, closingTag, variableName);
+    return await transform(template, { jsxRuntime: 'classic' });
+  };  
+  
+  const replaceSVGImages = async (html) => {
+    const matches = findSVGMatches(html);
+  
+    let output = '';
+    let cursor = 0;
   
     for (const match of matches) {
-      const [fullMatch, group1, group2, group3] = match;
-      const start = match.index;
-      const end = start + fullMatch.length;
+      const { fullSvg, attributes, content, closingTag, start, end } = parseSVGMatch(match);
   
-      result += html.slice(lastIndex, start);
+      output += html.slice(cursor, start);
   
-      const content = group2.trim();
-      if (content) {
-        const randomSVGVariable = generateRandomVariableName('svg');
-        setRandomAttributeContent(randomSVGVariable, content.replaceAll('className', 'class'));
-        createPanel({
-          type: 'svg',
-          title: 'SVG Markup',
-          attributes: [randomSVGVariable],
-        });
+      if (hasContent(content)) {
+        const variableName = handleSVGContent(content);
   
-        const replacement = await transform(
-          getSvgTemplate(fullMatch, group1, group3, randomSVGVariable),
-          { jsxRuntime: 'classic' }
+        const transformed = await transformSVG(
+          fullSvg,
+          attributes,
+          closingTag,
+          variableName
         );
   
-        result += replacement;
+        output += transformed;
       } else {
-        result += fullMatch;
+        output += fullSvg;
       }
   
-      lastIndex = end;
+      cursor = end;
     }
   
-    result += html.slice(lastIndex);
-
-    return result;
+    output += html.slice(cursor);
+  
+    return output;
   };
+  
   const getSvgPanelTemplate = (panel) => {
     return panel.attributes && attributes[panel.attributes]
       ? `
@@ -1267,28 +1353,35 @@ const block = async (
     };
   };
 
+  const mergeAttributes = (attrString) => {
+    const attrRegex = /(\S+)=["'](.*?)["']/g;
+    const attrs = {};
+    let match;
+    
+    while ((match = attrRegex.exec(attrString)) !== null) {
+      attrs[match[1]] = match[2];
+    }
+    return attrs;
+  };
+
   const unwrapAnchor = (htmlContent) => {
+  
     return htmlContent.replace(
       /<span([^>]*)>\s*<a([^>]*)>(.*?)<\/a>\s*<\/span>/gi,
       (_, spanAttrs, anchorAttrs, content) => {
-        const allAttrs = {};
-        const attrRegex = /(\S+)=["'](.*?)["']/g;
-
-        let match;
-        while ((match = attrRegex.exec(spanAttrs)) !== null) {
-          allAttrs[match[1]] = match[2];
-        }
-
-        while ((match = attrRegex.exec(anchorAttrs)) !== null) {
-          allAttrs[match[1]] = match[2];
-        }
-
-        return `<a ${Object.entries(allAttrs)
+        const spanAttributes = mergeAttributes(spanAttrs);
+        const anchorAttributes = mergeAttributes(anchorAttrs);
+        const allAttributes = { ...spanAttributes, ...anchorAttributes };
+  
+        const attrString = Object.entries(allAttributes)
           .map(([key, value]) => `${key}="${value}"`)
-          .join(' ')}>${content}</a>`;
+          .join(' ');
+  
+        return `<a ${attrString}>${content}</a>`;
       }
     );
   };
+  
 
   const getComponentAttributes = () => {
     return JSON.stringify(attributes, null, 2);
@@ -1297,31 +1390,42 @@ const block = async (
   const getEdit = async (options) => {
     let { htmlContent } = options;
 
-    if (htmlContent) {
-      htmlContent = await getEditJsxContent(processLinks(options));
-
-      return (await replaceSVGImages(htmlContent.replace(/<article\b([^>]*)>/gi, '<div$1>').replace(/<\/article>/gi, '</div>').replaceAll('../', '').replace(/style="([^"]+)"/g, (_, styleString) => {
-        const styleObj = parseStyleString(styleString);
-
-        return `style={${styleObj}}`;
-      })));
+    if (!htmlContent) {
+      return '';
     }
 
-    return '';
+    const processedOptions = processLinks(options);
+    const jsxContent = await getEditJsxContent(processedOptions);
+
+    const replacedContent = jsxContent
+      .replace(/<article\b([^>]*)>/gi, '<div$1>')
+      .replace(/<\/article>/gi, '</div>')
+      .replaceAll('../', '')
+      .replace(/style="([^"]+)"/g, (_, styleString) => {
+        const styleObj = parseInlineStyle(styleString);
+        return `style={${styleObj}}`;
+      });
+
+    return await replaceSVGImages(replacedContent);
   };
+
   
   const parseBlockAttributes = () => {
-    return `${JSON.parse(
-      JSON.stringify(getComponentAttributes(), null, 2)
-    ).replace(/"var.url\+\'(.*?)\'(.*?)"/g, "vars.url+'$1'$2").replaceAll("var(.*?).url\+'(http.*?)'", 'http$2')}`;
-  }
+    const attributes = getComponentAttributes();
+    const jsonString = JSON.stringify(attributes, null, 2);
+  
+    return jsonString
+    .replace(/"var.url\+\'(.*?)\'(.*?)"/g, "vars.url+'$1'$2")
+    .replace(/var(.*?).url\+'(http.*?)'/g, 'http$2');
+  };  
 
   const fixDangerouslySetInnerHTML = (edit) => {
-    return edit.replace(
-      /dangerouslySetInnerHTML="{" {="" __html:="" (.*?)="" }}=""/gm,
-      `dangerouslySetInnerHTML={{ __html: $1 }}`
-    );
-  }
+    const pattern = /dangerouslySetInnerHTML="{" {="" __html:="" (.*?)="" }}=""/gm;
+    const replacement = 'dangerouslySetInnerHTML={{ __html: $1 }}';
+
+    return edit.replace(pattern, replacement);
+  };
+  
   const getBlock = async (htmlContent, settings) => {
     let {
       name,

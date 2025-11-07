@@ -3,7 +3,7 @@
 
   
 
-Convert HTML string to valid, editable WordPress Gutenberg blocks in seconds instead of hours. With this script, you can create & build valid Gutenberg blocks that have editable text, forms, inline and background images, as well as SVGs. Includes support for TailwindCSS.
+Convert HTML strings to valid, editable WordPress Gutenberg blocks in seconds instead of hours. With this script, you can create and build valid Gutenberg blocks that feature editable text, forms, inline and background images, as well as SVGs. It includes support for TailwindCSS.
 
   
 
@@ -81,7 +81,7 @@ const  htmlString = '<div>My content</div>';
 
   
 
-Provided a valid html string with the required options, the block function will output the required WordPress block files with the specified configuration. To install the block and its assets, simply load the generated files into the plugins folder and activate it.
+When provided with a valid HTML string and the required options, the block function will generate the necessary WordPress block files with the specified configuration. To install the block and its assets, simply load the generated folder into the plugins folder and activate it.
 
   
 
@@ -99,7 +99,7 @@ Provided a valid html string with the required options, the block function will 
 | Option              | Description                                                                                                                                           | Type     | Required?                                                                                          | Default            |
 |---------------------|-------------------------------------------------------------------------------------------------------------------------------------------------------|----------|-----------------------------------------------------------------------------------------------------|-------------------|
 | name                | The name of your block. This will also be used for the folder name and internal references.                                                          | string   | Yes                                                                                                 | My block          |
-| source              | An URL where relative paths resolve to. E.g., `http://localhost/website`.                                                                     | string   | Yes, only if the HTML string or the stylesheet contains relative paths.                             | null              |
+| source              | A URL where relative paths resolve. E.g., `http://localhost/website`.                                                                     | string   | Yes, only if the HTML string or the stylesheet has relative paths.                             | null              |
 | prefix              | A namespace prefix for the block name, typically aligned with your project (e.g., "wp" or "myplugins").                                              | string   | No                                                                                                  | wp                |
 | category            | The WordPress block category where the block appears in the editor. Use an existing one or register a custom category if needed.                    | string   | No                                                                                                  | common            |
 | basePath            | The absolute path where the output files and folders will be saved.                                                                                  | string   | No                                                                                                  | Current directory |
