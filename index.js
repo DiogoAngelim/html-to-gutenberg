@@ -1,12 +1,10 @@
 import presetReact from '@babel/preset-react';
-import { transform } from '@svgr/core';
 import * as babel from '@babel/core';
 import * as cheerio from 'cheerio';
 import scopeCss from 'css-scoping';
 import extractAssets from 'fetch-page-assets';
 import fs from 'fs';
 import icon from 'html-screenshots';
-import imageToBase64 from 'image-to-base64';
 import { createRequire } from 'module';
 import convert from 'node-html-to-jsx';
 import path from 'path';
@@ -52,125 +50,93 @@ const block = async (
 
       return jsFiles.some(url => tailwindCdnRegex.test(url));
   }
-  
-  function parseInlineStyle(styleString) {
-    if (!styleString || typeof styleString !== 'string') return '';
-  
-    const styleEntries = styleString
-      .split(';')
-      .map(rule => rule.trim())
-      .filter(Boolean)
-      .map(rule => {
-        const [property, value] = rule.split(':').map(part => part.trim());
-  
-        if (!property || !value) return null;
-  
-        const camelCasedProperty = property.replace(/-([a-z])/g, (_, char) => char.toUpperCase());
-  
-        return [camelCasedProperty, value];
-      })
-      .filter(Boolean);
-  
-    const styleObject = Object.fromEntries(styleEntries);
-  
-    return JSON.stringify(styleObject).replace(/"([^"]+)":/g, '$1:');
+
+  function replaceSourceUrlVars(str, source) {
+    if (!source) return str;
+
+    const escapedSource = source.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const pattern = new RegExp(`var\.url\+'${escapedSource}([^']+)'`, 'g');
+    return str.replace(pattern, (match, path) => `\${vars.url}${path}`);
   }
 
-  function sanitizeAndReplaceLeadingNumbers(input) {
+  function sanitizeAndReplaceLeadingNumbers(str) {
     const numberWords = ['zero', 'one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine'];
-    let hasReplacedFirstNumber = false;
+    let firstNumberReplaced = false;
   
-    return input
+    return str
       .toLowerCase()
       .replace(/[\s\-_]/g, '')
       .replace(/\d/g, (digit) => {
-        if (hasReplacedFirstNumber) return digit;
-  
-        hasReplacedFirstNumber = true;
-        return numberWords[parseInt(digit)] + digit;
+        if (!firstNumberReplaced) {
+          firstNumberReplaced = true;
+
+          return numberWords[parseInt(digit)] + digit;
+        }
+        return digit;
       })
       .replace(/^[^a-z]+/, '');
-  }  
+  }
    
-  const replaceUnderscoresSpacesAndUppercaseLetters = (input = '') => {
-    const nonWordOrUnderscore = /\W|_/g;
-    return input.replace(nonWordOrUnderscore, '-').toLowerCase();
-  };  
-
-  const buildFilePath = (basePath, fileName) => {
-    return path.join(basePath, fileName);
+  const replaceUnderscoresSpacesAndUppercaseLetters = (name = '') => {
+    return name.replace(new RegExp(/\W|_/, 'g'), '-').toLowerCase();
   };
-  
-  const writeFile = (filePath, data) => {
-    fs.writeFileSync(filePath, data);
-  };  
 
   const saveFile = (fileName, contents, options) => {
     try {
-      const filePath = buildFilePath(options.basePath, fileName);
-      writeFile(filePath, contents);
+      const filePath = path.join(options.basePath, fileName);
+      
+      fs.writeFileSync(filePath, contents);
+      
       return contents;
     } catch (error) {
       logError(error);
     }
-  };  
+  };
 
-  function buildRelativeUrlRegex() {
-    const attributes = [
-      'src',
-      'href',
-      'action',
-      'srcset',
-      'poster',
-      'data',
-      'formaction'
+  function replaceRelativeUrls(html, replacer) {
+    const urlAttributes = [
+      'src', 'href', 'action', 'srcset', 'poster', 'data', 'formaction'
     ];
   
-    const protocolsToIgnore = ['https?:', '//', 'mailto:', 'tel:', '#'].join('|');
-  
-    return new RegExp(
-      `\\b(${attributes.join('|')}|data-[a-zA-Z0-9_-]+)\\s*=\\s*(['"])(?!${protocolsToIgnore})([^'"]+)\\2`,
+    const regex = new RegExp(
+      `\\b(${urlAttributes.join('|')}|data-[a-zA-Z0-9_-]+)\\s*=\\s*(['"])(?!https?:|//|mailto:|tel:|#)([^'"]+)\\2`,
       'gi'
     );
-  }
   
-  function replaceRelativeUrls(html, replacer) {
-    const regex = buildRelativeUrlRegex();
-    return html.replace(regex, (_match, attribute, quote, url) => {
-      const updatedUrl = replacer(url);
-      return `${attribute}=${quote}${updatedUrl}${quote}`;
+    return html.replace(regex, (_match, attr, quote, url) => {
+      const newUrl = replacer(url);
+      return `${attr}=${quote}${newUrl}${quote}`;
     });
   }
-
-  function getRelativeUrlCssRegex() {
-    const ignoredProtocols = ['https?:', '//', 'data:', 'mailto:', 'tel:', '#'].join('|');
-    return new RegExp(
-      `url\\(\\s*(['"]?)(?!${ignoredProtocols})([^'")]+)\\1\\s*\\)`,
-      'gi'
-    );
-  }  
+  
 
   function replaceRelativeUrlsInCss(css, replacer) {
-    const regex = getRelativeUrlCssRegex();
-  
-    return css.replace(regex, (_match, quote, url) => {
-      const updatedUrl = replacer(url);
-      return `url(${quote}${updatedUrl}${quote})`;
-    });
-  }
+    const regex = /url\(\s*(['"]?)(.+?)\1\s*\)/gi;
 
-  function resolveUrl(relativePath, baseUrl) {
-    return new URL(relativePath, baseUrl).href;
+    return css.replace(regex, (match, quote, url) => {
+      if (/^(https?:|\/\/|data:|mailto:|tel:|#)/.test(url.trim())) {
+        return match;
+      }
+      const newUrl = replacer(url);
+      return `url(${quote}${newUrl}${quote})`;
+    });
   }
   
   function replaceRelativeUrlsInHtml(html, baseUrl) {
-    return replaceRelativeUrls(html, (url) => resolveUrl(url, baseUrl));
+    return replaceRelativeUrls(html, (url) => {
+      return new URL(url, baseUrl).href;
+    });
   }
-  
+
   function replaceRelativeUrlsInCssWithBase(css, cssFileUrl) {
-    return replaceRelativeUrlsInCss(css, (url) => resolveUrl(url, cssFileUrl));
-  }
-  
+    return replaceRelativeUrlsInCss(css, (url) => {
+      if (/^(https?:|\/\/|data:|mailto:|tel:|#)/.test(url.trim())) {
+        return url;
+      }
+      return new URL(url, cssFileUrl).href;
+    });
+  }  
+
   const parseRequirements = async (files, options) => {
     const { source } = options;
     let output = '';
@@ -198,14 +164,13 @@ const block = async (
     return output;
   };
 
-  const convertDashesSpacesAndUppercaseToUnderscoresAndLowercase = (input = '') => {
-    if (!input) return '';
-  
-    return input
-      .replaceAll('-', '_')
-      .replaceAll(' ', '_')
-      .toLowerCase();
-  };  
+  const convertDashesSpacesAndUppercaseToUnderscoresAndLowercase = (string) => {
+    if (string) {
+      return `${string.replaceAll('-', '_').replaceAll(' ', '_').toLowerCase()}`;
+    }
+
+    return '';
+  };
 
   const newName = replaceUnderscoresSpacesAndUppercaseLetters(name);
   const blockName = `${sanitizeAndReplaceLeadingNumbers(replaceUnderscoresSpacesAndUppercaseLetters(prefix))}/${sanitizeAndReplaceLeadingNumbers(replaceUnderscoresSpacesAndUppercaseLetters(name))}`;
@@ -420,14 +385,39 @@ const block = async (
   `;
   };
 
-  function transformBlockFile(code) {
-    const transformOptions = {
+  function preprocessSvgAttributes(code) {
+    return code.replace(/(<svg[\s\S]*?>[\s\S]*?<\/svg>)/gi, (svgBlock) => {
+      let processed = svgBlock.replace(/([a-zA-Z0-9]+)-([a-zA-Z0-9]+)=/g, (match, p1, p2) => {
+        const camel = p1 + p2.charAt(0).toUpperCase() + p2.slice(1);
+        return camel + '=';
+      });
+      return processed;
+    });
+  }
+
+  function unwrapBody(code) {
+    try {
+      return code.replace(/<\/?(html|body)[^>]*>/gi, '');
+    } catch (e) {
+      return code;
+    }
+  }
+
+  function transformBlockFile(blockCode) {    
+    let test = '';
+    
+    try {
+      test = babel.transformSync(blockCode, {
       presets: [[presetReact, { pragma: 'wp.element.createElement' }]],
-      filename: 'block.js',
-    };
-  
-    return babel.transformSync(code, transformOptions);
-  }  
+      filename: 'block.js'
+    });
+    } catch (error) {
+      console.log(error);
+      
+    }
+
+    return test;
+  }
   
   const saveFiles = async (options) => {
     const { cssFiles = [], jsFiles = [], shouldSaveFiles, name, prefix } = options;
@@ -442,33 +432,57 @@ const block = async (
 
     css += await parseRequirements(cssFiles, options);
 
+    console.log('[CSS BEFORE]', css);
+    
+
     for (const style of styles) {
       css += style.content;
     }
 
+    css = css.replace(/[^{}]+:is\([^)]*\[.*?['"].*?\)[^{}]*\{[^}]*\}/g, '');
+
     const scopedCssFrontend = scopeCss(css, `.wp-block-${sanitizeAndReplaceLeadingNumbers(replaceUnderscoresSpacesAndUppercaseLetters(prefix))}-${sanitizeAndReplaceLeadingNumbers(replaceUnderscoresSpacesAndUppercaseLetters(name))}`);
     const editorStyleFile = scopeCss(css, `[data-type="${blockName}"]`);
     const scriptFile = js;
-    let blockCode = await getBlock(htmlContent, options);
 
-    blockCode = blockCode
-      .replace(/<style[^>]*>[\s\S]*?<\/style>/gi, '')
-      .replace(/<script[^>]*>[\s\S]*?<\/script>/gi, '')
-      .replace(/<link[^>]*?>/gi, '');
+     htmlContent = htmlContent
+    .replace(/<head[\s\S]*?<\/head>/gi, '')
+    .replace(/<script[\s\S]*?<\/script>/gi, '')
+    .replace(/<style[\s\S]*?<\/style>/gi, '');
+
+
+    let blockCode = await getBlock(options);
+    
+    blockCode = blockCode.replaceAll(' / dangerouslySetInnerHTML', ' dangerouslySetInnerHTML')
 
     const indexFile = getPhp(options);
+    let blockFile = '';
 
-    const blockFile = transformBlockFile(blockCode).code
-    .replace(/name: \"\{field.name\}\"/g, 'name: field.name')
-    .replace(/key: \"\{index\}\"/g, 'key: index')
+    try {
+       blockFile = transformBlockFile(blockCode).code
+    ?.replace(/name: \"\{field.name\}\"/g, 'name: field.name')
+    ?.replace(/key: \"\{index\}\"/g, 'key: index')
+    } catch (error) {
+      
+      console.log(error);
+      
+    }
 
+    console.log(blockFile);
+    
+    
     if (shouldSaveFiles) {
-      saveFile('style.css', scopedCssFrontend, options);
-      saveFile('editor.css', editorStyleFile, options);
-      saveFile('scripts.js', `${scriptFile}\n\n${emailTemplate}`, options);
-      saveFile('index.php', indexFile, options);
-      saveFile('block.js', blockFile, options);
-      saveFile('remote-loader.js', '', options);
+      try {
+        saveFile('style.css', scopedCssFrontend, options);
+        saveFile('editor.css', editorStyleFile, options);
+        saveFile('scripts.js', `${scriptFile}\n\n${emailTemplate}`, options);
+        saveFile('index.php', indexFile, options);
+        saveFile('block.js', blockFile, options);
+        saveFile('remote-loader.js', '', options);
+      } catch (error) {
+        console.log(error);
+        
+      }
     }
 
     return {
@@ -497,22 +511,14 @@ const block = async (
     return `${prefix}${suffix}`;
   };
 
-  const functionSufix = generateRandomVariableName('func', 6);
+  const functionSufix = generateRandomVariableName('func');
 
   const setRandomAttributeContent = (randomVariableName, content) => {
-    let newContent = content;
     const isArray = Array.isArray(content);
+    
 
-    if (typeof content === 'string') {
-      newContent = content.replace(/(?:<[^>]*>|[^<"]*")|"/g, (match) => {
-        if (match === '"') {
-          return '&quot;';
-        }
-        return match;
-      })
-    }
-
-    attributes[randomVariableName] = { type: isArray ? 'array' : 'string', default: newContent };
+    attributes[randomVariableName] = { type: isArray ? 'array' : 'string', default: content };
+    
   };
 
   const hasAbsoluteKeyword = (str) => {
@@ -641,11 +647,29 @@ const block = async (
     const newPrefix = prefix ? replaceUnderscoresSpacesAndUppercaseLetters(prefix) : 'wp';
     const randomVariable = generateRandomVariableName(`${type}${newPrefix}`);
 
+    let imgSrcWithoutOrigin = imgSrc;
+    try {
+      if (typeof imgSrc === 'string') {
+        if (/^https?:\/\//.test(imgSrc)) {
+          const urlObj = new URL(imgSrc);
+          imgSrcWithoutOrigin = urlObj.pathname + urlObj.search + urlObj.hash;
+        } else if (source && imgSrc.startsWith(source)) {
+          imgSrcWithoutOrigin = imgSrc.slice(source.length);
+          if (imgSrcWithoutOrigin.startsWith('/')) imgSrcWithoutOrigin = imgSrcWithoutOrigin.slice(1);
+        }
+      }
+    } catch (e) {
+      imgSrcWithoutOrigin = imgSrc;
+    }
+    let imgSrcNoLeadingSlash = imgSrcWithoutOrigin;
+    if (typeof imgSrcNoLeadingSlash === 'string' && imgSrcNoLeadingSlash.startsWith('/')) {
+      imgSrcNoLeadingSlash = imgSrcNoLeadingSlash.slice(1);
+    }
     attributes[randomVariable] = {
       attribute,
       type: 'string',
       selector: 'img',
-      default: attribute === 'alt' ? imgAlt : `var.url+'${imgSrc}'`,
+      default: attribute === 'alt' ? imgAlt : `{vars.url}${imgSrcNoLeadingSlash}`.replace(/^\u007f/, '$'),
     };
 
     imgTag.attr(attribute, `{attributes.${randomVariable}}`);
@@ -774,31 +798,25 @@ const block = async (
   };
 
   const getFixedHtml = (html) => {
-    const onChangeRegex = / onChange="{" \(newtext\)=""\>/gi;
-    const closeRichTextRegex = /<\/RichText>/gi;
-    const valueBindingRegex = /value="{(.*?)}"/gi;
-    const attributeBindingRegex = /"{attributes\.(.*?)}"/gi;
-    
-    const fixOnChange = ' onChange={ (newtext) => ';
-    const fixValueBinding = 'value={$1}';
-    const fixAttributeBinding = '{attributes.$1}';
-
     return html
-      .replace(onChangeRegex, fixOnChange)
-      .replace(closeRichTextRegex, '')
-      .replace(valueBindingRegex, fixValueBinding)
-      .replace(attributeBindingRegex, fixAttributeBinding);
+      .replace(/ onChange="{" \(newtext\)=""\>/gi, ' onChange={ (newtext) => ')
+      .replace(/\<\/RichText\>/gi, '')
+      .replace(/value="{(.*?)}"/gi, 'value={$1}')
+      .replace(/"{attributes.(.*?)}"/gi, '{attributes.$1}');
   };
-  
 
   const processImages = (imgTag) => {
     const properties = getImageProperties(imgTag);
-    const type = properties.isBackground ? 'background' : 'image';
-  
-    processImage({ ...properties, type });
-  };
+    const { isBackground } = properties;
 
-  
+    if (!isBackground) {
+      processImage({ ...properties, type: 'image' });
+
+      return;
+    }
+
+    processImage({ ...properties, type: 'background' });
+  };
   const loopImages = ($) => {
     $('img').each((_index, img) => {
       processImages($(img));
@@ -834,138 +852,85 @@ const block = async (
     return getRichTextTemplate(randomVariable, variableContent);
   };
 
-  const containsCodeSyntax = (text) => {
-    const codePattern = /{|}|\(|\)|=>/;
-    return codePattern.test(text.trim());
-  };
-  
-  const isEmptyText = (text) => {
-    return text.trim() === '';
-  };
-
   const parseContent = (content) => {
-    return content.replace(/>([^<]+)</g, (match, text) => {
-      const hasCodeSyntax = containsCodeSyntax(text);
-      const isEmpty = isEmptyText(text);
-  
-      if (hasCodeSyntax || isEmpty) {
+    return content.replace(/>([^<]+)</g, (match, variableContent) => {
+      const regex = /{|}|\(|\)|=>/;
+
+      if (regex.test(variableContent.trim())) {
         return match;
       }
   
-      return convertToRichText(text);
-    });
-  };
-
-  const removeHtmlComments = (html) => {
-    return html.replaceAll(/<!--(.*?)-->/gs, '');
-  };
-  
-  const wrapWithContainer = (html) => {
-    return `<div className="custom-block">${html}</div>`;
-  };
-    
-  const getEditJsxContent = async (options) => {
-    const dynamicContent = transformFormToDynamicJSX(htmlContent);
-    const withoutComments = removeHtmlComments(dynamicContent);
-    const wrappedContent = wrapWithContainer(withoutComments);
-  
-    const parsedContent = convert(parseContent(wrappedContent));
-  
-    return await processEditImages({
-      ...options,
-      htmlContent: parsedContent,
-    });
-  };
-  
-  const hasAttributes = (panel) => {
-    return Array.isArray(panel.attributes) && panel.attributes.length > 0;
-  };  
-
-  const createPanel = (panel) => {
-    if (!hasAttributes(panel)) return;
-  
-    panels.push(panel);
-  };
-
-  const getSvgTemplate = (_match, attributesString, closingTag, variableName) => {
-    return `
-      <svg
-        ${attributesString}
-        dangerouslySetInnerHTML={{ __html: attributes.${variableName} }}
-      >
-      ${closingTag}
-      `;
-  };
-
-  const findSVGMatches = (html) => {
-    const svgRegex = /<\s*svg\b((?:[^>'"]|"[^"]*"|'[^']*')*)>(\s*(?:[^<]|<(?!\/svg\s*>))*)(<\/\s*svg\s*>)/gim;
-    return [...html.matchAll(svgRegex)];
-  };
-  
-  const parseSVGMatch = (match) => {
-    const [fullSvg, attributes, content, closingTag] = match;
-    const start = match.index;
-    const end = start + fullSvg.length;
-  
-    return { fullSvg, attributes, content, closingTag, start, end };
-  };
-  
-  const hasContent = (content) => content.trim() !== '';
-  
-  const handleSVGContent = (content) => {
-    const variableName = generateRandomVariableName('svg');
-    const cleanedContent = content.replaceAll('className', 'class');
-  
-    setRandomAttributeContent(variableName, cleanedContent);
-  
-    createPanel({
-      type: 'svg',
-      title: 'SVG Markup',
-      attributes: [variableName],
-    });
-  
-    return variableName;
-  };
-  
-  const transformSVG = async (fullSvg, attributes, closingTag, variableName) => {
-    const template = getSvgTemplate(fullSvg, attributes, closingTag, variableName);
-    return await transform(template, { jsxRuntime: 'classic' });
-  };  
-  
-  const replaceSVGImages = async (html) => {
-    const matches = findSVGMatches(html);
-  
-    let output = '';
-    let cursor = 0;
-  
-    for (const match of matches) {
-      const { fullSvg, attributes, content, closingTag, start, end } = parseSVGMatch(match);
-  
-      output += html.slice(cursor, start);
-  
-      if (hasContent(content)) {
-        const variableName = handleSVGContent(content);
-  
-        const transformed = await transformSVG(
-          fullSvg,
-          attributes,
-          closingTag,
-          variableName
-        );
-  
-        output += transformed;
-      } else {
-        output += fullSvg;
+      if (variableContent.trim() === '') {
+        return match;
       }
   
-      cursor = end;
-    }
-  
-    output += html.slice(cursor);
-  
-    return output;
+      return convertToRichText(variableContent);
+    });
   };
   
+  const getEditJsxContent = async (options) => {    
+    let content = transformFormToDynamicJSX(options.htmlContent);
+
+    content = content.replaceAll(/<!--(.*?)-->/gs, '');
+
+    content = `<div className="custom-block">${content}</div>`;
+
+    return await processEditImages({
+      ...options,
+      htmlContent: parseContent(content),
+    });
+  };
+
+  const createPanel = (values) => {
+    if (values.attributes && values.attributes.length > 0) {
+      panels.push(values);
+    }
+  };
+
+  const getSvgTemplate = (_match, group1, _group3, randomSVGVariable) => {
+    return `<svg ${group1} dangerouslySetInnerHTML={ { __html: attributes.${randomSVGVariable} }}></svg>`;
+  };
+  const replaceSVGImages = async (html) => {
+    const regex = /<\s*svg\b((?:[^>'"]|"[^"]*"|'[^']*')*)>(\s*(?:[^<]|<(?!\/svg\s*>))*)(<\/\s*svg\s*>)/gim;
+  
+    let result = '';
+    let lastIndex = 0;
+    const matches = [...html.matchAll(regex)];
+  
+    for (const match of matches) {
+      const [fullMatch, group1, group2, group3] = match;
+      const start = match.index;
+      const end = start + fullMatch.length;
+  
+      result += html.slice(lastIndex, start);      
+  
+      const content = group2.trim();
+      if (content) {
+        const randomSVGVariable = generateRandomVariableName('svg');
+        setRandomAttributeContent(randomSVGVariable, content.replaceAll('className', 'class'));
+        createPanel({
+          type: 'svg',
+          title: 'SVG Markup',
+          attributes: [randomSVGVariable],
+        });
+        
+  
+        const replacement = getSvgTemplate(fullMatch, group1, group3, randomSVGVariable)
+        
+        result += replacement;
+      } else {
+        result += fullMatch;
+      }
+  
+      lastIndex = end;
+    }
+  
+    result += html.slice(lastIndex);
+    
+    console.log(result);
+    
+    return result;
+  };
   const getSvgPanelTemplate = (panel) => {
     return panel.attributes && attributes[panel.attributes]
       ? `
@@ -1004,10 +969,7 @@ const block = async (
         <PanelRow>
           <div>
             <MediaUpload
-              onSelect={ (media) => { 
-                setAttributes({ 
-                  ${mediaAtts}
-                }); 
+              onSelect={ (media) => { setAttributes({ ${mediaAtts} }); 
               } }
               type="image"
               value={ attributes.${panel.attributes?.[0]} }
@@ -1316,7 +1278,7 @@ const block = async (
       /<RichText((.|\n)*?)value=\{(.*?)\}((.|\n)*?)\/>/gi,
       '<RichText.Content value={$3} />'
     )
-    .replace(/className=/gi, 'class=')
+    .replaceAll('class=', 'className=')
     .replace(
       /<MediaUpload\b[^>]*>([\s\S]*?(<img\b[^>]*>*\/>)[\s\S]*?)\/>/g,
       (_match, _attributes, img) => {
@@ -1353,108 +1315,71 @@ const block = async (
     };
   };
 
-  const mergeAttributes = (attrString) => {
-    const attrRegex = /(\S+)=["'](.*?)["']/g;
-    const attrs = {};
-    let match;
-    
-    while ((match = attrRegex.exec(attrString)) !== null) {
-      attrs[match[1]] = match[2];
-    }
-    return attrs;
-  };
-
   const unwrapAnchor = (htmlContent) => {
-  
     return htmlContent.replace(
       /<span([^>]*)>\s*<a([^>]*)>(.*?)<\/a>\s*<\/span>/gi,
       (_, spanAttrs, anchorAttrs, content) => {
-        const spanAttributes = mergeAttributes(spanAttrs);
-        const anchorAttributes = mergeAttributes(anchorAttrs);
-        const allAttributes = { ...spanAttributes, ...anchorAttributes };
-  
-        const attrString = Object.entries(allAttributes)
+        const allAttrs = {};
+        const attrRegex = /(\S+)=["'](.*?)["']/g;
+
+        let match;
+        while ((match = attrRegex.exec(spanAttrs)) !== null) {
+          allAttrs[match[1]] = match[2];
+        }
+
+        while ((match = attrRegex.exec(anchorAttrs)) !== null) {
+          allAttrs[match[1]] = match[2];
+        }
+
+        return `<a ${Object.entries(allAttrs)
           .map(([key, value]) => `${key}="${value}"`)
-          .join(' ');
-  
-        return `<a ${attrString}>${content}</a>`;
+          .join(' ')}>${content}</a>`;
       }
     );
   };
-  
 
   const getComponentAttributes = () => {
-    return JSON.stringify(attributes, null, 2);
+    return Object.entries(attributes)
+    .map(([key, value]) => {
+      if (typeof value === 'object' && value !== null) {
+        return `${key}: { ${Object.entries(value).map(([k, v]) => `${k}: \`${v}\``).join(', ')} }`;
+      } else {
+        return `${key}:\`${value}\``;
+      }
+    })
+    .join(',\n');
   };
 
   const getEdit = async (options) => {
     let { htmlContent } = options;
 
-    if (!htmlContent) {
-      return '';
+    if (htmlContent) {
+      options.htmlContent = unwrapBody(htmlContent);            
+      const postProcessLinks = processLinks(options);
+      const postGetEditJsx = await getEditJsxContent(postProcessLinks);
+      const preConvert = await postGetEditJsx.replace(/<\/br>/g, '<br/>').replace(/<\/hr>/g, '<hr/>')
+      return convert(preConvert)
     }
 
-    const processedOptions = processLinks(options);
-    const jsxContent = await getEditJsxContent(processedOptions);
-
-    const replacedContent = jsxContent
-      .replace(/<article\b([^>]*)>/gi, '<div$1>')
-      .replace(/<\/article>/gi, '</div>')
-      .replaceAll('../', '')
-      .replace(/style="([^"]+)"/g, (_, styleString) => {
-        const styleObj = parseInlineStyle(styleString);
-        return `style={${styleObj}}`;
-      });
-
-    return await replaceSVGImages(replacedContent);
+    return '';
   };
-
   
   const parseBlockAttributes = () => {
-    const attributes = getComponentAttributes();
-    const jsonString = JSON.stringify(attributes, null, 2);
-  
-    return jsonString
-    .replace(/"var.url\+\'(.*?)\'(.*?)"/g, "vars.url+'$1'$2")
-    .replace(/var(.*?).url\+'(http.*?)'/g, 'http$2');
-  };  
+  const attrs = `{${getComponentAttributes()}}`;
+  return replaceSourceUrlVars(attrs, options.source);
+  }
 
-  const fixDangerouslySetInnerHTML = (edit) => {
-    const pattern = /dangerouslySetInnerHTML="{" {="" __html:="" (.*?)="" }}=""/gm;
-    const replacement = 'dangerouslySetInnerHTML={{ __html: $1 }}';
-
-    return edit.replace(pattern, replacement);
-  };
-  
-  const getBlock = async (htmlContent, settings) => {
+  const getBlock = async (settings) => {
     let {
       name,
       category,
       generateIconPreview,
-      basePath,
-      cssFiles = [],
-      jsFiles = [],
     } = settings;
 
-    let iconPreview = "'shield'";
-    let edit = await getEdit(settings);
-    
-    edit = fixDangerouslySetInnerHTML(edit);
-    
+    const iconPreview = generateIconPreview ? `(<img src={vars.url + 'preview.jpeg'} />)` : "'shield'";
+    const edit = await getEdit(settings);    
     const save = buildSaveContent(edit);
-    const blockPanels = createPanels();
-    const blockAttributes = parseBlockAttributes();
-    
-    if (generateIconPreview) {
-      try {
-        await icon(htmlContent, { basePath, cssFiles, jsFiles });
-        iconPreview = `(<img src="data:image/jpeg;base64,${await imageToBase64(
-          path.join(basePath, 'preview.jpeg')
-        )}" />)`;
-      } catch (error) {
-        console.log(`There was an error generating preview. ${error.message}`);
-      }
-    }
+    const blockPanels = createPanels(); 
 
     const output = `
     (function () {
@@ -1464,7 +1389,7 @@ const block = async (
             title: '${name}',
             icon: ${iconPreview},
             category: '${category}',
-            attributes: ${blockAttributes},
+            attributes: ${parseBlockAttributes()},
             edit(props) {
               const { attributes, setAttributes } = props;
 
@@ -1488,16 +1413,13 @@ const block = async (
         });
         })();`;
 
-    if (generateIconPreview) {
-      return output.replace(/icon: \s * (')([^']*)(')/, 'icon: $2');
-    }
-
     return output;
   };
 
   const setupVariables = async (htmlContent, options) => {
-    const styleRegex = /<style[^>]*>([\s\S]*?)<\/style>/gi;
-    const linkRegex = /<link\s+[^>]*href=["']([^"']+)["'][^>]*>/gi;
+ 
+  const styleRegex = /<style[^>]*>([\s\S]*?)<\/style>/gi;
+  const linkRegex = /<link\b[^>]*((\brel=["']stylesheet["'])|\bhref=["'][^"']+\.css["'])[^>]*>/gi;
 
     let match;
 
@@ -1523,6 +1445,10 @@ const block = async (
     css += styles.map((style) => {
       return `${style.content}`;
     }).join('\n');
+
+
+    console.log('[CSSFETCHED]', css);
+    
     
 
     const scriptRegex = /<script[^>]*>([\s\S]*?)<\/script>/gi;
@@ -1564,6 +1490,18 @@ const block = async (
 
     const newDir = path.join(basePath, replaceUnderscoresSpacesAndUppercaseLetters(name));
 
+    const $ = cheerio.load(htmlContent, {
+      xmlMode: true,
+      decodeEntities: false,
+    });
+
+    $('head, script, style').remove();
+    
+    htmlContent = $('body').html();
+
+    options.html
+    
+
     try {
       fs.mkdirSync(newDir, { recursive: true });
 
@@ -1583,7 +1521,14 @@ const block = async (
     htmlContent = replaceRelativeUrlsInHtml(htmlContent, source);
     htmlContent = replaceRelativeUrlsInCssWithBase(htmlContent, source);
   }
+  
+  try {
+    icon(htmlContent, { basePath: path.join(options.basePath, replaceUnderscoresSpacesAndUppercaseLetters(options.name)) });
+  } catch (error) {
+    console.log(`There was an error generating preview. ${error.message}`);
+  }
 
   return saveFiles(await setupVariables(htmlContent, options));
 };
+
 export default block;

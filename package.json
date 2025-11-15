@@ -4,7 +4,7 @@
     "@babel/preset-react": "^7.28.5",
     "@svgr/core": "^8.1.0",
     "cheerio": "^1.1.2",
-    "css-scoping": "^1.0.0",
+    "css-scoping": "^1.0.1",
     "fetch-page-assets": "^1.2.5",
     "fs": "^0.0.1-security",
     "html-screenshots": "^1.2.7",
@@ -14,20 +14,24 @@
   },
   "devDependencies": {
     "@types/babel__core": "^7.20.5",
+    "@types/beautify": "^0.0.3",
     "@types/cheerio": "^1.0.0",
-    "@types/image-to-base64": "^2.1.2"
+    "@types/image-to-base64": "^2.1.2",
+    "@types/prettier": "^3.0.0",
+    "@types/svgo": "^3.0.0"
   },
   "type": "module",
   "types": "index.ts",
   "name": "html-to-gutenberg",
-  "version": "4.2.2",
+  "version": "4.2.5",
   "description": "Transform any valid HTML string into fully editable WP Gutenberg blocks in seconds rather than hours.",
   "main": "index.js",
   "directories": {
     "test": "test"
   },
   "scripts": {
-    "test": "jest"
+    "test": "jest",
+    "build": "tsc"
   },
   "repository": {
     "type": "git",
