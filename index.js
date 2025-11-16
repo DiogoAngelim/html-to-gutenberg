@@ -798,7 +798,21 @@ const block = async (
   };
 
   const getFixedHtml = (html) => {
+    function parseStyleString(style) {
+      const entries = style.split(';').filter(Boolean).map(rule => {
+        const [key, value] = rule.split(':');
+        if (!key || !value) return null;
+        const camelKey = key.trim().replace(/-([a-z])/g, (_, char) => char.toUpperCase());
+        return [camelKey, value.trim()];
+      }).filter(Boolean);
+      const styleObject = Object.fromEntries(entries);
+      return JSON.stringify(styleObject).replace(/"([^"\n]+)":/g, '$1:');
+    }
     return html
+      .replace(/style="([^"]+)"/g, (_, styleString) => {
+        const styleObj = parseStyleString(styleString);
+        return `style={${styleObj}}`;
+      })
       .replace(/ onChange="{" \(newtext\)=""\>/gi, ' onChange={ (newtext) => ')
       .replace(/\<\/RichText\>/gi, '')
       .replace(/value="{(.*?)}"/gi, 'value={$1}')

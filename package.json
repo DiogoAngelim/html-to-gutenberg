@@ -5,7 +5,7 @@
     "@svgr/core": "^8.1.0",
     "cheerio": "^1.1.2",
     "css-scoping": "^1.0.1",
-    "fetch-page-assets": "^1.2.5",
+    "fetch-page-assets": "^1.2.6",
     "fs": "^0.0.1-security",
     "html-screenshots": "^1.2.7",
     "image-to-base64": "^2.2.0",
@@ -23,7 +23,7 @@
   "type": "module",
   "types": "index.ts",
   "name": "html-to-gutenberg",
-  "version": "4.2.5",
+  "version": "4.2.7",
   "description": "Transform any valid HTML string into fully editable WP Gutenberg blocks in seconds rather than hours.",
   "main": "index.js",
   "directories": {
