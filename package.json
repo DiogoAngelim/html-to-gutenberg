@@ -78,21 +78,44 @@
       "*.test.ts"
     ],
     "include": [
-      "*.ts",
-      "**/*.ts"
+      "dist/*.js",
+      "dist/**/*.js"
     ],
     "extension": [
       ".ts",
       ".js"
     ],
-    "all": true
+    "all": true,
+    "sourceMap": true,
+    "instrument": true
   },
   "jest": {
-    "preset": "ts-jest",
+    "preset": "ts-jest/presets/js-with-ts",
+    "testEnvironment": "node",
+    "extensionsToTreatAsEsm": [
+      ".ts"
+    ],
+    "transform": {
+      "^.+\\.tsx?$": [
+        "ts-jest",
+        {
+          "useESM": true
+        }
+      ]
+    },
+    "globals": {
+      "ts-jest": {
+        "tsconfig": "tsconfig.json",
+        "useESM": true
+      }
+    },
+    "moduleNameMapper": {
+      "^(\\.{1,2}/.*)\\.js$": "$1"
+    },
     "collectCoverage": true,
     "collectCoverageFrom": [
-      "**/*.ts",
-      "!**/*.test.ts"
+      "dist/*.js",
+      "!dist/*.test.js"
     ]
   }
 }
