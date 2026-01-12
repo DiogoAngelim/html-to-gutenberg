@@ -3,7 +3,7 @@
 <html lang="en">
 
 <head>
-    <title>Code coverage report for utils.ts</title>
+    <title>Code coverage report for utils.js</title>
     <meta charset="utf-8" />
     <link rel="stylesheet" href="prettify.css" />
     <link rel="stylesheet" href="base.css" />
@@ -19,13 +19,13 @@
 <body>
 <div class='wrapper'>
     <div class='pad1'>
-        <h1><a href="index.html">All files</a> utils.ts</h1>
+        <h1><a href="index.html">All files</a> utils.js</h1>
         <div class='clearfix'>
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">97.36% </span>
+                <span class="strong">97.43% </span>
                 <span class="quiet">Statements</span>
-                <span class='fraction'>37/38</span>
+                <span class='fraction'>38/39</span>
             </div>
         
             
@@ -44,9 +44,9 @@
         
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">100% </span>
+                <span class="strong">97.22% </span>
                 <span class="quiet">Lines</span>
-                <span class='fraction'>32/32</span>
+                <span class='fraction'>35/36</span>
             </div>
         
             
@@ -118,21 +118,35 @@
 <a name='L53'></a><a href='#L53'>53</a>
 <a name='L54'></a><a href='#L54'>54</a>
 <a name='L55'></a><a href='#L55'>55</a>
-<a name='L56'></a><a href='#L56'>56</a></td><td class="line-coverage quiet"><span class="cline-any cline-neutral">&nbsp;</span>
+<a name='L56'></a><a href='#L56'>56</a>
+<a name='L57'></a><a href='#L57'>57</a>
+<a name='L58'></a><a href='#L58'>58</a>
+<a name='L59'></a><a href='#L59'>59</a>
+<a name='L60'></a><a href='#L60'>60</a>
+<a name='L61'></a><a href='#L61'>61</a></td><td class="line-coverage quiet"><span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-yes">5x</span>
 <span class="cline-any cline-yes">5x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-yes">1x</span>
 <span class="cline-any cline-yes">5x</span>
-<span class="cline-any cline-yes">4x</span>
-<span class="cline-any cline-yes">4x</span>
-<span class="cline-any cline-yes">4x</span>
-<span class="cline-any cline-yes">4x</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">4x</span>
+<span class="cline-any cline-yes">4x</span>
+<span class="cline-any cline-yes">4x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">4x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-yes">5x</span>
 <span class="cline-any cline-yes">5x</span>
 <span class="cline-any cline-yes">5x</span>
@@ -148,94 +162,95 @@
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-yes">1x</span>
 <span class="cline-any cline-yes">5x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-yes">1x</span>
 <span class="cline-any cline-yes">5x</span>
 <span class="cline-any cline-yes">4x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-yes">1x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-yes">1x</span>
 <span class="cline-any cline-yes">5x</span>
+<span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-yes">5x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-yes">1x</span>
 <span class="cline-any cline-yes">4x</span>
 <span class="cline-any cline-yes">4x</span>
 <span class="cline-any cline-yes">4x</span>
 <span class="cline-any cline-yes">11x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-yes">4x</span>
-<span class="cline-any cline-neutral">&nbsp;</span></td><td class="text"><pre class="prettyprint lang-js">// Utility functions for html-to-gutenberg
-export function hasTailwindCdnSource(jsFiles: string[]): boolean {
-  const tailwindCdnRegex = /https:\/\/(cdn\.tailwindcss\.com(\?[^"'\s]*)?|cdn\.jsdelivr\.net\/npm\/@tailwindcss\/browser@4(\.\d+){0,2})/;
-  return jsFiles.some((url: string) =&gt; tailwindCdnRegex.test(url));
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span></td><td class="text"><pre class="prettyprint lang-js">"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.hasTailwindCdnSource = hasTailwindCdnSource;
+exports.replaceSourceUrlVars = replaceSourceUrlVars;
+exports.sanitizeAndReplaceLeadingNumbers = sanitizeAndReplaceLeadingNumbers;
+exports.replaceUnderscoresSpacesAndUppercaseLetters = replaceUnderscoresSpacesAndUppercaseLetters;
+exports.convertDashesSpacesAndUppercaseToUnderscoresAndLowercase = convertDashesSpacesAndUppercaseToUnderscoresAndLowercase;
+exports.hasAbsoluteKeyword = hasAbsoluteKeyword;
+exports.generateRandomVariableName = generateRandomVariableName;
+// Utility functions for html-to-gutenberg
+function hasTailwindCdnSource(jsFiles) {
+    const tailwindCdnRegex = /https:\/\/(cdn\.tailwindcss\.com(\?[^"'\s]*)?|cdn\.jsdelivr\.net\/npm\/@tailwindcss\/browser@4(\.\d+){0,2})/;
+    return jsFiles.some((url) =&gt; tailwindCdnRegex.test(url));
 }
-&nbsp;
-export function replaceSourceUrlVars(str: string, source: any): string {
-  if (!source) return str;
-  const escapedSource = String(source).replace(/[.*+?^${}()|[\]\\]/g, '\\$&amp;');
-  const pattern = new RegExp(`var\\.url\\+'${escapedSource}([^']*)'`, 'g');
-  if (!pattern.test(str)) return str;
-  return str.replace(pattern, (_match: string, path: string) =&gt; `\${vars.url}${path}`);
+function replaceSourceUrlVars(str, source) {
+    if (!source)
+        return str;
+    const escapedSource = String(source).replace(/[.*+?^${}()|[\]\\]/g, '\\$&amp;');
+    const pattern = new RegExp(`var\\.url\\+'${escapedSource}([^']*)'`, 'g');
+    if (!pattern.test(str))
+        return str;
+    return str.replace(pattern, (_match, path) =&gt; `\${vars.url}${path}`);
 }
-&nbsp;
-export function sanitizeAndReplaceLeadingNumbers(str: string): string {
-  const numberWords = ['zero', 'one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine'];
-  let firstNumberReplaced = false;
-  return str
-    .toLowerCase()
-    .replace(/[\s\-_]/g, '')
-    .replace(/\d/g, (digit: string) =&gt; {
-      if (!firstNumberReplaced) {
-        firstNumberReplaced = true;
-        return numberWords[parseInt(digit)] + digit;
-      }
-      return digit;
+function sanitizeAndReplaceLeadingNumbers(str) {
+    const numberWords = ['zero', 'one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine'];
+    let firstNumberReplaced = false;
+    return str
+        .toLowerCase()
+        .replace(/[\s\-_]/g, '')
+        .replace(/\d/g, (digit) =&gt; {
+        if (!firstNumberReplaced) {
+            firstNumberReplaced = true;
+            return numberWords[parseInt(digit)] + digit;
+        }
+        return digit;
     })
-    .replace(/^[^a-z]+/, '');
+        .replace(/^[^a-z]+/, '');
 }
-&nbsp;
-export function replaceUnderscoresSpacesAndUppercaseLetters(name: string = <span class="branch-0 cbranch-no" title="branch not covered" >'')</span>: string {
-  return name.replace(new RegExp(/\W|_/, 'g'), '-').toLowerCase();
+function replaceUnderscoresSpacesAndUppercaseLetters(name = <span class="branch-0 cbranch-no" title="branch not covered" >'')</span> {
+    return name.replace(new RegExp(/\W|_/, 'g'), '-').toLowerCase();
 }
-&nbsp;
-export function convertDashesSpacesAndUppercaseToUnderscoresAndLowercase(string: string): string {
-  if (string) {
-    return `${string.replaceAll('-', '_').replaceAll(' ', '_').toLowerCase()}`;
-  }
-  return '';
+function convertDashesSpacesAndUppercaseToUnderscoresAndLowercase(string) {
+    if (string) {
+        return `${string.replaceAll('-', '_').replaceAll(' ', '_').toLowerCase()}`;
+    }
+    return '';
 }
-&nbsp;
-export function hasAbsoluteKeyword(str: string): boolean {
-  <span class="missing-if-branch" title="if path not taken" >I</span>if (typeof str !== 'string') <span class="cstat-no" title="statement not covered" >return false;</span>
-  return str.toLowerCase().includes('absolute');
+function hasAbsoluteKeyword(str) {
+    <span class="missing-if-branch" title="if path not taken" >I</span>if (typeof str !== 'string')
+<span class="cstat-no" title="statement not covered" >        return false;</span>
+    return str.toLowerCase().includes('absolute');
 }
-&nbsp;
-export function generateRandomVariableName(prefix: string = <span class="branch-0 cbranch-no" title="branch not covered" >'content',</span> length: number = 3): string {
-  const chars = 'abcdefghijklmnopqrstuvwxyz';
-  let suffix = '';
-  for (let i = 0; i &lt; length; i++) {
-    suffix += chars.charAt(
-      Math.floor(Math.random() * chars.length)
-    );
-  }
-  return `${prefix}${suffix}`;
-}</pre></td></tr></table></pre>
+function generateRandomVariableName(prefix = <span class="branch-0 cbranch-no" title="branch not covered" >'content',</span> length = 3) {
+    const chars = 'abcdefghijklmnopqrstuvwxyz';
+    let suffix = '';
+    for (let i = 0; i &lt; length; i++) {
+        suffix += chars.charAt(Math.floor(Math.random() * chars.length));
+    }
+    return `${prefix}${suffix}`;
+}
+//# sourceMappingURL=utils.js.map</pre></td></tr></table></pre>
 
                 <div class='push'></div><!-- for sticky footer -->
             </div><!-- /wrapper -->
             <div class='footer quiet pad2 space-top1 center small'>
                 Code coverage generated by
                 <a href="https://istanbul.js.org/" target="_blank" rel="noopener noreferrer">istanbul</a>
-                at 2026-01-12T16:42:57.549Z
+                at 2026-01-12T16:52:21.381Z
             </div>
         <script src="prettify.js"></script>
         <script>

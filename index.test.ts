@@ -1,143 +1,145 @@
 import * as utils from './utils';
+import { expect } from 'chai';
+// Removed imports from index and globals to avoid ESM parsing errors
 
 describe('utils.ts functions', () => {
-  test('hasTailwindCdnSource returns true for Tailwind CDN', () => {
-    expect(utils.hasTailwindCdnSource(['https://cdn.tailwindcss.com'])).toBe(true);
-    expect(utils.hasTailwindCdnSource(['https://example.com'])).toBe(false);
+  it('hasTailwindCdnSource returns true for Tailwind CDN', () => {
+    expect(utils.hasTailwindCdnSource(['https://cdn.tailwindcss.com'])).to.equal(true);
+    expect(utils.hasTailwindCdnSource(['https://example.com'])).to.equal(false);
   });
 
-  test('replaceSourceUrlVars returns input if no match', () => {
+  it('replaceSourceUrlVars returns input if no match', () => {
     const str = "var.url+'http://site.com/path'";
     const expected = "${vars.url}/path";
-    expect(utils.replaceSourceUrlVars(str, 'http://site.com')).toBe(expected);
+    expect(utils.replaceSourceUrlVars(str, 'http://site.com')).to.equal(expected);
   });
 
-  test('sanitizeAndReplaceLeadingNumbers replaces leading numbers', () => {
-    expect(utils.sanitizeAndReplaceLeadingNumbers('1test')).toMatch(/one1test|1test/);
+  it('sanitizeAndReplaceLeadingNumbers replaces leading numbers', () => {
+    expect(utils.sanitizeAndReplaceLeadingNumbers('1test')).to.match(/one1test|1test/);
   });
 
-  test('replaceUnderscoresSpacesAndUppercaseLetters replaces underscores and spaces', () => {
-    expect(utils.replaceUnderscoresSpacesAndUppercaseLetters('Test_Name Here')).toBe('test-name-here');
+  it('replaceUnderscoresSpacesAndUppercaseLetters replaces underscores and spaces', () => {
+    expect(utils.replaceUnderscoresSpacesAndUppercaseLetters('Test_Name Here')).to.equal('test-name-here');
   });
 
-  test('convertDashesSpacesAndUppercaseToUnderscoresAndLowercase converts correctly', () => {
-    expect(utils.convertDashesSpacesAndUppercaseToUnderscoresAndLowercase('Test-Name Here')).toBe('test_name_here');
+  it('convertDashesSpacesAndUppercaseToUnderscoresAndLowercase converts correctly', () => {
+    expect(utils.convertDashesSpacesAndUppercaseToUnderscoresAndLowercase('Test-Name Here')).to.equal('test_name_here');
   });
 
-  test('hasAbsoluteKeyword detects absolute', () => {
-    expect(utils.hasAbsoluteKeyword('absolute')).toBe(true);
-    expect(utils.hasAbsoluteKeyword('relative')).toBe(false);
+  it('hasAbsoluteKeyword detects absolute', () => {
+    expect(utils.hasAbsoluteKeyword('absolute')).to.equal(true);
+    expect(utils.hasAbsoluteKeyword('relative')).to.equal(false);
   });
 
-  test('generateRandomVariableName returns string with prefix', () => {
-    expect(utils.generateRandomVariableName('prefix')).toMatch(/^prefix/);
+  it('generateRandomVariableName returns string with prefix', () => {
+    expect(utils.generateRandomVariableName('prefix')).to.match(/^prefix/);
   });
 
   // Additional coverage tests
 
   describe('hasTailwindCdnSource edge cases', () => {
-    test('returns false for empty array', () => {
-      expect(utils.hasTailwindCdnSource([])).toBe(false);
+    it('returns false for empty array', () => {
+      expect(utils.hasTailwindCdnSource([])).to.equal(false);
     });
-    test('returns true for multiple tailwind URLs', () => {
+    it('returns true for multiple tailwind URLs', () => {
       expect(utils.hasTailwindCdnSource([
         'https://cdn.tailwindcss.com',
         'https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4.0.0'
-      ])).toBe(true);
+      ])).to.equal(true);
     });
-    test('returns false for malformed URLs', () => {
-      expect(utils.hasTailwindCdnSource(['not-a-url'])).toBe(false);
+    it('returns false for malformed URLs', () => {
+      expect(utils.hasTailwindCdnSource(['not-a-url'])).to.equal(false);
     });
   });
 
   describe('replaceSourceUrlVars edge cases', () => {
-    test('replaces matching pattern', () => {
+    it('replaces matching pattern', () => {
       const str = "var.url+'http://site.com/path'";
       const source = 'http://site.com';
       const expected = "${vars.url}/path";
-      expect(utils.replaceSourceUrlVars(str, source)).toContain(expected);
+      expect(utils.replaceSourceUrlVars(str, source)).to.contain(expected);
     });
-    test('returns input for empty string', () => {
-      expect(utils.replaceSourceUrlVars('', 'http://site.com')).toBe('');
+    it('returns input for empty string', () => {
+      expect(utils.replaceSourceUrlVars('', 'http://site.com')).to.equal('');
     });
-    test('returns input for null source', () => {
-      expect(utils.replaceSourceUrlVars("var.url+'http://site.com/path'", null)).toBe("var.url+'http://site.com/path'");
+    it('returns input for null source', () => {
+      expect(utils.replaceSourceUrlVars("var.url+'http://site.com/path'", null)).to.equal("var.url+'http://site.com/path'");
     });
-    test('replaces multiple matches', () => {
+    it('replaces multiple matches', () => {
       const str = "var.url+'http://site.com/a' and var.url+'http://site.com/b'";
       const source = 'http://site.com';
       const result = utils.replaceSourceUrlVars(str, source);
-      expect(result.match(/\$\{vars\.url\}/g)?.length).toBeGreaterThanOrEqual(2);
+      expect(result.match(/\${vars\.url}/g)?.length).to.be.greaterThanOrEqual(2);
     });
   });
 
   describe('sanitizeAndReplaceLeadingNumbers edge cases', () => {
-    test('returns input for no numbers', () => {
-      expect(utils.sanitizeAndReplaceLeadingNumbers('test')).toBe('test');
+    it('returns input for no numbers', () => {
+      expect(utils.sanitizeAndReplaceLeadingNumbers('test')).to.equal('test');
     });
-    test('handles multiple leading numbers', () => {
-      expect(utils.sanitizeAndReplaceLeadingNumbers('123abc')).toMatch(/one1two2three3abc|123abc/);
+    it('handles multiple leading numbers', () => {
+      expect(utils.sanitizeAndReplaceLeadingNumbers('123abc')).to.match(/one1two2three3abc|123abc/);
     });
-    test('handles only numbers', () => {
-      expect(utils.sanitizeAndReplaceLeadingNumbers('123')).toMatch(/one1two2three3|123/);
+    it('handles only numbers', () => {
+      expect(utils.sanitizeAndReplaceLeadingNumbers('123')).to.match(/one1two2three3|123/);
     });
-    test('handles special characters', () => {
-      expect(utils.sanitizeAndReplaceLeadingNumbers('1_test')).toMatch(/one1test|1test/);
+    it('handles special characters', () => {
+      expect(utils.sanitizeAndReplaceLeadingNumbers('1_test')).to.match(/one1test|1test/);
     });
   });
 
   describe('replaceUnderscoresSpacesAndUppercaseLetters edge cases', () => {
-    test('handles only underscores', () => {
-      expect(utils.replaceUnderscoresSpacesAndUppercaseLetters('___')).toBe('---');
+    it('handles only underscores', () => {
+      expect(utils.replaceUnderscoresSpacesAndUppercaseLetters('___')).to.equal('---');
     });
-    test('handles only spaces', () => {
-      expect(utils.replaceUnderscoresSpacesAndUppercaseLetters('   ')).toBe('---');
+    it('handles only spaces', () => {
+      expect(utils.replaceUnderscoresSpacesAndUppercaseLetters('   ')).to.equal('---');
     });
-    test('handles mixed cases', () => {
-      expect(utils.replaceUnderscoresSpacesAndUppercaseLetters('Test_Name Here')).toBe('test-name-here');
+    it('handles mixed cases', () => {
+      expect(utils.replaceUnderscoresSpacesAndUppercaseLetters('Test_Name Here')).to.equal('test-name-here');
     });
-    test('handles empty string', () => {
-      expect(utils.replaceUnderscoresSpacesAndUppercaseLetters('')).toBe('');
+    it('handles empty string', () => {
+      expect(utils.replaceUnderscoresSpacesAndUppercaseLetters('')).to.equal('');
     });
   });
 
   describe('convertDashesSpacesAndUppercaseToUnderscoresAndLowercase edge cases', () => {
-    test('handles only dashes', () => {
-      expect(utils.convertDashesSpacesAndUppercaseToUnderscoresAndLowercase('---')).toBe('___');
+    it('handles only dashes', () => {
+      expect(utils.convertDashesSpacesAndUppercaseToUnderscoresAndLowercase('---')).to.equal('___');
     });
-    test('handles only spaces', () => {
-      expect(utils.convertDashesSpacesAndUppercaseToUnderscoresAndLowercase('   ')).toBe('___');
+    it('handles only spaces', () => {
+      expect(utils.convertDashesSpacesAndUppercaseToUnderscoresAndLowercase('   ')).to.equal('___');
     });
-    test('handles mixed cases', () => {
-      expect(utils.convertDashesSpacesAndUppercaseToUnderscoresAndLowercase('Test-Name Here')).toBe('test_name_here');
+    it('handles mixed cases', () => {
+      expect(utils.convertDashesSpacesAndUppercaseToUnderscoresAndLowercase('Test-Name Here')).to.equal('test_name_here');
     });
-    test('handles empty string', () => {
-      expect(utils.convertDashesSpacesAndUppercaseToUnderscoresAndLowercase('')).toBe('');
+    it('handles empty string', () => {
+      expect(utils.convertDashesSpacesAndUppercaseToUnderscoresAndLowercase('')).to.equal('');
     });
   });
 
   describe('hasAbsoluteKeyword edge cases', () => {
-    test('detects uppercase', () => {
-      expect(utils.hasAbsoluteKeyword('ABSOLUTE')).toBe(true);
+    it('detects uppercase', () => {
+      expect(utils.hasAbsoluteKeyword('ABSOLUTE')).to.equal(true);
     });
-    test('returns false for empty string', () => {
-      expect(utils.hasAbsoluteKeyword('')).toBe(false);
+    it('returns false for empty string', () => {
+      expect(utils.hasAbsoluteKeyword('')).to.equal(false);
     });
-    test('returns false for empty string', () => {
-      expect(utils.hasAbsoluteKeyword('')).toBe(false);
+    it('returns false for empty string', () => {
+      expect(utils.hasAbsoluteKeyword('')).to.equal(false);
     });
   });
 
   describe('generateRandomVariableName edge cases', () => {
-    test('returns prefix only for length 0', () => {
-      expect(utils.generateRandomVariableName('prefix', 0)).toBe('prefix');
+    it('returns prefix only for length 0', () => {
+      expect(utils.generateRandomVariableName('prefix', 0)).to.equal('prefix');
     });
-    test('returns only random part for empty prefix', () => {
-      expect(utils.generateRandomVariableName('', 3)).toMatch(/^[a-z]{3}$/);
+    it('returns only random part for empty prefix', () => {
+      expect(utils.generateRandomVariableName('', 3)).to.match(/^[a-z]{3}$/);
     });
-    test('returns correct length', () => {
+    it('returns correct length', () => {
       const result = utils.generateRandomVariableName('pre', 5);
-      expect(result.length).toBe(8);
+      expect(result.length).to.equal(8);
     });
   });
 });

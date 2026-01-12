@@ -16,6 +16,7 @@
     "@eslint/js": "^9.39.2",
     "@types/babel__core": "^7.20.5",
     "@types/beautify": "^0.0.3",
+    "@types/chai": "^5.2.3",
     "@types/cheerio": "^1.0.0",
     "@types/image-to-base64": "^2.1.2",
     "@types/jest": "^30.0.0",
@@ -23,13 +24,16 @@
     "@types/svgo": "^3.0.0",
     "@typescript-eslint/eslint-plugin": "^8.52.0",
     "@typescript-eslint/parser": "^8.52.0",
+    "chai": "^6.2.2",
     "coveralls": "^3.1.1",
     "eslint": "^8.57.1",
+    "mocha": "^11.7.5",
     "nyc": "^17.1.0",
+    "source-map-support": "^0.5.21",
     "ts-jest": "^29.4.6",
+    "ts-node": "^10.9.2",
     "typescript-eslint": "^8.52.0"
   },
-  "type": "module",
   "types": "index.ts",
   "name": "html-to-gutenberg",
   "version": "4.2.8",
@@ -39,10 +43,10 @@
     "test": "test"
   },
   "scripts": {
-    "test": "jest",
+    "test": "mocha -r ts-node/register index.test.ts",
     "build": "tsc",
-    "coverage": "nyc npm test",
-    "coveralls": "nyc npm test && nyc report --reporter=lcov && cat coverage/lcov.info | coveralls"
+    "coverage": "nyc mocha -r ts-node/register index.test.ts",
+    "coveralls": "nyc mocha -r ts-node/register index.test.ts && nyc report --reporter=lcov && cat coverage/lcov.info | coveralls"
   },
   "repository": {
     "type": "git",
@@ -73,13 +77,11 @@
       "text"
     ],
     "exclude": [
-      "coverage",
-      "test",
-      "*.test.ts"
+      "coverage"
     ],
     "include": [
-      "dist/*.js",
-      "dist/**/*.js"
+      "src/*.ts",
+      "src/**/*.ts"
     ],
     "extension": [
       ".ts",
@@ -87,7 +89,10 @@
     ],
     "all": true,
     "sourceMap": true,
-    "instrument": true
+    "instrument": true,
+    "require": [
+      "ts-node/register"
+    ]
   },
   "jest": {
     "preset": "ts-jest/presets/js-with-ts",
@@ -116,6 +121,9 @@
     "collectCoverageFrom": [
       "dist/*.js",
       "!dist/*.test.js"
+    ],
+    "testMatch": [
+      "<rootDir>/dist/*.test.js"
     ]
   }
 }
