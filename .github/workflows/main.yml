@@ -24,11 +24,9 @@ jobs:
         run: npm run build
       - name: Run tests
         run: npm test
-
-        - name: Run coverage
-          run: npm run coverage
-
-        - name: Upload coverage to Coveralls
-          env:
-            COVERALLS_REPO_TOKEN: ${{ secrets.COVERALLS_REPO_TOKEN }}
-          run: npm run coveralls
+      - name: Run coverage
+        run: npm run coverage
+      - name: Upload coverage to Coveralls
+        env:
+          COVERALLS_REPO_TOKEN: ${{ secrets.COVERALLS_REPO_TOKEN }}
+        run: npm run coveralls
