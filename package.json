@@ -67,21 +67,16 @@
     "url": "https://github.com/DiogoAngelim/html-to-gutenberg/issues"
   },
   "homepage": "https://www.html-to-gutenberg.io",
-  "nyc": {
-    "reporter": [
-      "lcov",
-      "text"
-    ],
-    "exclude": [
-      "dist",
-      "coverage",
-      "test",
-      "*.test.ts"
-    ],
-    "extension": [
-      ".ts",
-      ".js"
-    ],
-    "all": true
-  }
+    "nyc": {
+      "reporter": ["lcov", "text"],
+      "exclude": ["coverage", "test", "*.test.ts"],
+      "include": ["*.ts", "**/*.ts"],
+      "extension": [".ts", ".js"],
+      "all": true
+    },
+    "jest": {
+      "preset": "ts-jest",
+      "collectCoverage": true,
+      "collectCoverageFrom": ["**/*.ts", "!**/*.test.ts"]
+    }
 }
