@@ -23,7 +23,9 @@
     "@types/svgo": "^3.0.0",
     "@typescript-eslint/eslint-plugin": "^8.52.0",
     "@typescript-eslint/parser": "^8.52.0",
+    "coveralls": "^3.1.1",
     "eslint": "^8.57.1",
+    "nyc": "^17.1.0",
     "ts-jest": "^29.4.6",
     "typescript-eslint": "^8.52.0"
   },
@@ -38,7 +40,9 @@
   },
   "scripts": {
     "test": "jest",
-    "build": "tsc"
+    "build": "tsc",
+    "coverage": "nyc npm test",
+    "coveralls": "nyc npm test && nyc report --reporter=text-lcov | coveralls"
   },
   "repository": {
     "type": "git",
@@ -62,5 +66,22 @@
   "bugs": {
     "url": "https://github.com/DiogoAngelim/html-to-gutenberg/issues"
   },
-  "homepage": "https://www.html-to-gutenberg.io"
+  "homepage": "https://www.html-to-gutenberg.io",
+  "nyc": {
+    "reporter": [
+      "lcov",
+      "text"
+    ],
+    "exclude": [
+      "dist",
+      "coverage",
+      "test",
+      "*.test.ts"
+    ],
+    "extension": [
+      ".ts",
+      ".js"
+    ],
+    "all": true
+  }
 }
