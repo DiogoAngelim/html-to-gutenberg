@@ -1,5 +1,8 @@
-
 # HTML to Gutenberg Converter
+
+[![Build Status](https://github.com/DiogoAngelim/html-to-gutenberg/actions/workflows/main.yml/badge.svg)](https://github.com/DiogoAngelim/html-to-gutenberg/actions)
+[![Coverage Status](https://coveralls.io/repos/github/DiogoAngelim/html-to-gutenberg/badge.svg?branch=main)](https://coveralls.io/github/DiogoAngelim/html-to-gutenberg?branch=main)
+[![MIT License](https://img.shields.io/badge/license-MIT-blue.svg)](https://github.com/DiogoAngelim/html-to-gutenberg/blob/main/LICENSE.MD)
 
   
 

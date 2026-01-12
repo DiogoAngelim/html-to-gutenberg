@@ -430,10 +430,7 @@ const block = async (
       all: revert-layer; 
     }\n`;
 
-    css += await parseRequirements(cssFiles, options);
-
-    console.log('[CSS BEFORE]', css);
-    
+    css += await parseRequirements(cssFiles, options);    
 
     for (const style of styles) {
       css += style.content;
@@ -467,9 +464,6 @@ const block = async (
       console.log(error);
       
     }
-
-    console.log(blockFile);
-    
     
     if (shouldSaveFiles) {
       try {
@@ -800,9 +794,10 @@ const block = async (
   const getFixedHtml = (html) => {
     function parseStyleString(style) {
       const entries = style.split(';').filter(Boolean).map(rule => {
-        const [key, value] = rule.split(':');
+        let [key, value] = rule.split(':');
         if (!key || !value) return null;
-        const camelKey = key.trim().replace(/-([a-z])/g, (_, char) => char.toUpperCase());
+        key = key.trim().replace(/^[-\s]+/, '');
+        const camelKey = key.replace(/-([a-z])/g, (_, char) => char.toUpperCase());
         return [camelKey, value.trim()];
       }).filter(Boolean);
       const styleObject = Object.fromEntries(entries);
@@ -905,44 +900,40 @@ const block = async (
     return `<svg ${group1} dangerouslySetInnerHTML={ { __html: attributes.${randomSVGVariable} }}></svg>`;
   };
   const replaceSVGImages = async (html) => {
-    const regex = /<\s*svg\b((?:[^>'"]|"[^"]*"|'[^']*')*)>(\s*(?:[^<]|<(?!\/svg\s*>))*)(<\/\s*svg\s*>)/gim;
-  
+    // Improved SVG handling: preserve nesting and avoid splitting SVG from parent
+    const svgRegex = /(<svg[\s\S]*?<\/svg>)/gi;
     let result = '';
     let lastIndex = 0;
-    const matches = [...html.matchAll(regex)];
-  
-    for (const match of matches) {
-      const [fullMatch, group1, group2, group3] = match;
+    let match;
+
+    while ((match = svgRegex.exec(html)) !== null) {
+      const [svgBlock] = match;
       const start = match.index;
-      const end = start + fullMatch.length;
-  
-      result += html.slice(lastIndex, start);      
-  
-      const content = group2.trim();
-      if (content) {
+      const end = start + svgBlock.length;
+
+      // Add preceding HTML
+      result += html.slice(lastIndex, start);
+
+      // Extract attributes and inner content
+      const attrMatch = svgBlock.match(/^<svg([^>]*)>([\s\S]*?)<\/svg>$/i);
+      if (attrMatch) {
+        const group1 = attrMatch[1];
+        const group2 = attrMatch[2];
         const randomSVGVariable = generateRandomVariableName('svg');
-        setRandomAttributeContent(randomSVGVariable, content.replaceAll('className', 'class'));
+        setRandomAttributeContent(randomSVGVariable, group2.replaceAll('className', 'class'));
         createPanel({
           type: 'svg',
           title: 'SVG Markup',
           attributes: [randomSVGVariable],
         });
-        
-  
-        const replacement = getSvgTemplate(fullMatch, group1, group3, randomSVGVariable)
-        
-        result += replacement;
+        // Replace with JSX template, preserving parent context
+        result += getSvgTemplate(svgBlock, group1, '</svg>', randomSVGVariable);
       } else {
-        result += fullMatch;
+        result += svgBlock;
       }
-  
       lastIndex = end;
     }
-  
     result += html.slice(lastIndex);
-    
-    console.log(result);
-    
     return result;
   };
   const getSvgPanelTemplate = (panel) => {
@@ -1288,17 +1279,33 @@ const block = async (
   };
 
   const buildSaveContent = (editContent) => {
-    return editContent.replace(
+    // Ensure RichText and RichText.Content are always self-closing
+    let output = editContent.replace(
+      /<RichText((.|\n)*?)value=\{(.*?)\}((.|\n)*?)>([\s\S]*?)<\/RichText>/gi,
+      '<RichText.Content value={$3} />'
+    );
+    output = output.replace(
       /<RichText((.|\n)*?)value=\{(.*?)\}((.|\n)*?)\/>/gi,
       '<RichText.Content value={$3} />'
-    )
-    .replaceAll('class=', 'className=')
-    .replace(
+    );
+
+    // If a wrapper (e.g., span) contains only RichText.Content, keep the wrapper and its attributes
+    output = output.replace(
+      /(<([a-zA-Z0-9]+)([^>]*)>\s*)<RichText\.Content value=\{([^}]+)\} \/>(\s*<\/\2>)/gi,
+      (match, openTag, tagName, attrs, value, closeTag) => {
+        // Keep the wrapper and its attributes, insert RichText.Content inside
+        return `${openTag}<RichText.Content value={${value}} />${closeTag}`;
+      }
+    );
+
+    output = output.replaceAll('class=', 'className=');
+    output = output.replace(
       /<MediaUpload\b[^>]*>([\s\S]*?(<img\b[^>]*>*\/>)[\s\S]*?)\/>/g,
       (_match, _attributes, img) => {
         return img.replace(/onClick={[^}]+}\s*/, '');
       }
     );
+    return output;
   };
 
   const removeHref = (match) => {
@@ -1459,11 +1466,6 @@ const block = async (
     css += styles.map((style) => {
       return `${style.content}`;
     }).join('\n');
-
-
-    console.log('[CSSFETCHED]', css);
-    
-    
 
     const scriptRegex = /<script[^>]*>([\s\S]*?)<\/script>/gi;
     const scriptSrcRegex =
