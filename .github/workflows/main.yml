@@ -25,8 +25,8 @@ jobs:
       - name: Run tests
         run: npm test
       - name: Run coverage
-        run: npm run coverage
+        run: npx nyc mocha -r ts-node/register src/utils.test.ts src/utils-extra.test.ts
       - name: Upload coverage to Coveralls
         env:
           COVERALLS_REPO_TOKEN: ${{ secrets.COVERALLS_REPO_TOKEN }}
-        run: npm run coveralls
+        run: npx nyc report --reporter=lcov && cat coverage/lcov.info | npx coveralls
