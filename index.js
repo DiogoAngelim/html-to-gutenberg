@@ -450,20 +450,20 @@ const block = async (
 
 
     let blockCode = await getBlock(options);
-    
+
+    // Ensure all <img> tags are self-closing for valid JSX
+    blockCode = blockCode.replace(/<img([^>/]*?)>/g, '<img$1 />');
     blockCode = blockCode.replaceAll(' / dangerouslySetInnerHTML', ' dangerouslySetInnerHTML')
 
     const indexFile = getPhp(options);
     let blockFile = '';
 
     try {
-       blockFile = transformBlockFile(blockCode).code
-    ?.replace(/name: \"\{field.name\}\"/g, 'name: field.name')
-    ?.replace(/key: \"\{index\}\"/g, 'key: index')
+      blockFile = transformBlockFile(blockCode).code
+        ?.replace(/name: \"\{field.name\}\"/g, 'name: field.name')
+        ?.replace(/key: \"\{index\}\"/g, 'key: index');
     } catch (error) {
-      
       console.log(error);
-      
     }
     
     if (shouldSaveFiles) {
