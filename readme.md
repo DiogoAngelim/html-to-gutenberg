@@ -10,6 +10,16 @@ Convert HTML strings to valid, editable WordPress Gutenberg blocks in seconds in
 
   
 
+
+## Screenshot Previews Powered by SnapAPI
+
+
+If you enable the `generateIconPreview` option, this package will generate a static JPEG preview of your block using the [SnapAPI](https://snapapi.pics/) screenshot service. You must provide a SnapAPI key in a `.env` file (see below).
+
+**Special thanks to [Alex Serebryakov](https://snapapi.pics/) for creating and maintaining SnapAPI!**
+
+---
+
 ## Features
 
   
@@ -47,7 +57,18 @@ Can be embedded in custom tools, UIs, or pipelines to generate Gutenberg blocks 
   
   
 
-## Installation
+
+## Environment Variables
+
+To use the screenshot preview feature, create a `.env` file in your project root:
+
+```
+SNAPAPI_KEY=sk_live_your_snapapi_key_here
+```
+
+You can get your SnapAPI key at [https://snapapi.pics/](https://snapapi.pics/).
+
+An example file is provided as `.env.example`.
 
   
 
@@ -84,7 +105,10 @@ const  htmlString = '<div>My content</div>';
 
   
 
+
 When provided with a valid HTML string and the required options, the block function will generate the necessary WordPress block files with the specified configuration. To install the block and its assets, simply load the generated folder into the plugins folder and activate it.
+
+If `generateIconPreview` is set to `true` and a `source` URL is provided, a `preview.jpeg` will be generated using SnapAPI and saved in your block's output folder.
 
   
 
@@ -106,11 +130,23 @@ When provided with a valid HTML string and the required options, the block funct
 | prefix              | A namespace prefix for the block name, typically aligned with your project (e.g., "wp" or "myplugins").                                              | string   | No                                                                                                  | wp                |
 | category            | The WordPress block category where the block appears in the editor. Use an existing one or register a custom category if needed.                    | string   | No                                                                                                  | common            |
 | basePath            | The absolute path where the output files and folders will be saved.                                                                                  | string   | No                                                                                                  | Current directory |
-| generateIconPreview | If `true`, generates a static image preview (JPEG) of the block's icon for display in the block picker.                                              | boolean  | No                                                                                                  | false             |
+| generateIconPreview | If `true`, generates a static image preview (JPEG) of the block's icon for display in the block picker using [SnapAPI](https://snapapi.pics/). Requires a valid API key in `.env`. | boolean  | No                                                                                                  | false             |
 | shouldSaveFiles     | When `true`, the generated block files are saved directly to disk. When `false`, returns an object containing the file contents as strings instead. | boolean  | No                                                                                                  | true              |
 | jsFiles             | An array of external JavaScript file URLs to enqueue with the block on the editor and the frontend. Useful for adding remote libraries.             | string[] | No                                                                                                  | []                |
 | cssFiles            | An array of external CSS file URLs to enqueue with the block on the editor and the frontend. Useful for adding additional remote stylesheets.        | string[] | No                                                                                                  | []                |
 
+
+## Running Tests
+
+To run the test suite, use:
+
+```bash
+npm test
+```
+
+This will execute all unit and integration tests using Mocha and Chai. Make sure all dependencies are installed with `npm install` before running tests.
+
+Some tests (such as screenshot preview generation) may require a valid SnapAPI key in your `.env` file.
 
 
 ## License
