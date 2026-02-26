@@ -1554,7 +1554,6 @@ const block = async (
         url: options.source,
         fullPage: true,
         delay: 4000,
-        blockAds: true,
         blockCookieBanners: true
       };
       const response = await fetch(snapApiUrl, {
@@ -1568,10 +1567,9 @@ const block = async (
       if (!response.ok) {
         throw new Error(`SnapAPI error: ${response.status}`);
       }
-      const blob = await response.blob();
       const previewPath = path.join(options.basePath, replaceUnderscoresSpacesAndUppercaseLetters(options.name), 'preview.jpeg');
-      const arrayBuffer = await blob.arrayBuffer();
-      fs.writeFileSync(previewPath, Buffer.from(arrayBuffer));
+      const buffer = Buffer.from(await response.arrayBuffer());
+      fs.writeFileSync(previewPath, buffer);
     } catch (error) {
       console.log(`There was an error generating preview with SnapAPI. ${error.message}`);
     }
@@ -1580,4 +1578,4 @@ const block = async (
   return saveFiles(await setupVariables(htmlContent, options));
 };
 
-// No default export here; handled in index.ts
+export default block;
