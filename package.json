@@ -19,7 +19,7 @@
     "@types/chai": "^5.2.3",
     "@types/cheerio": "^1.0.0",
     "@types/image-to-base64": "^2.1.2",
-    "@types/jest": "^30.0.0",
+    "@types/mocha": "^10.0.10",
     "@types/prettier": "^3.0.0",
     "@types/svgo": "^3.0.0",
     "@typescript-eslint/eslint-plugin": "^8.56.1",

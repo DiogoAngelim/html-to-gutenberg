@@ -1580,4 +1580,4 @@ const block = async (
   return saveFiles(await setupVariables(htmlContent, options));
 };
 
-export default block;
+// No default export here; handled in index.ts

@@ -3,11 +3,17 @@
     "sourceMap": true,
     "outDir": "dist",
     "target": "esnext",
-    "module": "CommonJS",
+    "module": "nodenext",
+    "moduleResolution": "nodenext",
+    "resolveJsonModule": true,
+    "skipLibCheck": true,
     "strict": true,
     "lib": [
       "esnext"
     ],
     "esModuleInterop": true,
-  }
+  },
+  "exclude": [
+    "node_modules"
+  ]
 }

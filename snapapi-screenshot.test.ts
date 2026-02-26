@@ -25,14 +25,18 @@ describe('block screenshot integration', () => {
     'preview.jpeg'
   );
 
-  after(() => {
+  after(function () {
     if (fs.existsSync(previewPath)) {
       fs.unlinkSync(previewPath);
-      fs.rmdirSync(path.dirname(previewPath), { recursive: true });
+      // Use fs.rmSync for recursive directory removal in Node >=14
+      const dir = path.dirname(previewPath);
+      if (fs.existsSync(dir)) {
+        fs.rmSync(dir, { recursive: true, force: true });
+      }
     }
   });
 
-  it('should generate a preview.jpeg using SnapAPI', async function () {
+  it('should generate a preview.jpeg using SnapAPI', async function (this: Mocha.Context) {
     this.timeout(15000); // Allow time for API call
     await block(testHtml, testOptions);
     expect(fs.existsSync(previewPath)).to.equal(true);

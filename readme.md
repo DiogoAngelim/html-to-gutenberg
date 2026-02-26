@@ -8,13 +8,6 @@
 
 Convert HTML strings to valid, editable WordPress Gutenberg blocks in seconds instead of hours. With this script, you can create and build valid Gutenberg blocks that feature editable text, forms, inline and background images, as well as SVGs. It includes support for TailwindCSS.
 
-  
-## Process Overview
-
-
-Below is a visual overview of the block generation process:
-
-![Block Generation Process](process.png)
 
 
 ## Screenshot Previews Powered by SnapAPI
@@ -61,7 +54,12 @@ Since it returns all files as either strings or source files, you can save them 
 Can be embedded in custom tools, UIs, or pipelines to generate Gutenberg blocks on demand.
 
   
-  
+## Process Overview
+
+
+Below is a visual overview of the block generation process:
+
+![Block Generation Process](process.png)  
 
 
 ## Environment Variables

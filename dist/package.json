@@ -1,0 +1,129 @@
+{
+    "dependencies": {
+        "@babel/core": "^7.29.0",
+        "@babel/preset-react": "^7.28.5",
+        "@svgr/core": "^8.1.0",
+        "cheerio": "^1.2.0",
+        "css-scoping": "^1.0.5",
+        "dotenv": "^17.3.1",
+        "fetch-page-assets": "^1.2.7",
+        "fs": "^0.0.1-security",
+        "node-fetch": "^3.3.2",
+        "node-html-to-jsx": "^1.4.4",
+        "path": "^0.12.7"
+    },
+    "devDependencies": {
+        "@eslint/js": "^10.0.1",
+        "@types/babel__core": "^7.20.5",
+        "@types/beautify": "^0.0.3",
+        "@types/chai": "^5.2.3",
+        "@types/cheerio": "^1.0.0",
+        "@types/image-to-base64": "^2.1.2",
+        "@types/mocha": "^10.0.10",
+        "@types/prettier": "^3.0.0",
+        "@types/svgo": "^3.0.0",
+        "@typescript-eslint/eslint-plugin": "^8.56.1",
+        "@typescript-eslint/parser": "^8.56.1",
+        "chai": "^6.2.2",
+        "coveralls": "^3.1.1",
+        "eslint": "^10.0.2",
+        "mocha": "^11.3.0",
+        "nyc": "^18.0.0",
+        "source-map-support": "^0.5.21",
+        "ts-jest": "^29.4.6",
+        "ts-node": "^10.9.2",
+        "typescript-eslint": "^8.56.1"
+    },
+    "types": "index.ts",
+    "name": "html-to-gutenberg",
+    "version": "4.2.8",
+    "description": "Transform any valid HTML string into fully editable WP Gutenberg blocks in seconds rather than hours.",
+    "main": "index.js",
+    "directories": {
+        "test": "test"
+    },
+    "scripts": {
+        "test": "mocha -r ts-node/register index.test.ts",
+        "build": "tsc",
+        "coverage": "nyc mocha -r ts-node/register index.test.ts",
+        "coveralls": "nyc mocha -r ts-node/register index.test.ts && nyc report --reporter=lcov && cat coverage/lcov.info | coveralls"
+    },
+    "repository": {
+        "type": "git",
+        "url": "git+https://github.com/DiogoAngelim/html-to-gutenberg.git"
+    },
+    "keywords": [
+        "frontend",
+        "gutenberg",
+        "html",
+        "wordpress",
+        "wp",
+        "jsx",
+        "converter",
+        "template",
+        "block",
+        "UI"
+    ],
+    "author": "Diogo Angelim",
+    "license": "MIT",
+    "funding": "https://www.paypal.com/donate/?hosted_button_id=XA5LN4XR39PMQ",
+    "bugs": {
+        "url": "https://github.com/DiogoAngelim/html-to-gutenberg/issues"
+    },
+    "homepage": "https://www.html-to-gutenberg.io",
+    "nyc": {
+        "reporter": [
+            "lcov",
+            "text"
+        ],
+        "exclude": [
+            "coverage"
+        ],
+        "include": [
+            "src/*.ts",
+            "src/**/*.ts"
+        ],
+        "extension": [
+            ".ts",
+            ".js"
+        ],
+        "all": true,
+        "sourceMap": true,
+        "instrument": true,
+        "require": [
+            "ts-node/register"
+        ]
+    },
+    "jest": {
+        "preset": "ts-jest/presets/js-with-ts",
+        "testEnvironment": "node",
+        "extensionsToTreatAsEsm": [
+            ".ts"
+        ],
+        "transform": {
+            "^.+\\.tsx?$": [
+                "ts-jest",
+                {
+                    "useESM": true
+                }
+            ]
+        },
+        "globals": {
+            "ts-jest": {
+                "tsconfig": "tsconfig.json",
+                "useESM": true
+            }
+        },
+        "moduleNameMapper": {
+            "^(\\.{1,2}/.*)\\.js$": "$1"
+        },
+        "collectCoverage": true,
+        "collectCoverageFrom": [
+            "dist/*.js",
+            "!dist/*.test.js"
+        ],
+        "testMatch": [
+            "<rootDir>/dist/*.test.js"
+        ]
+    }
+}
