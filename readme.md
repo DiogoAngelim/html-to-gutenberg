@@ -8,12 +8,6 @@
 
 Convert HTML strings to valid, editable WordPress Gutenberg blocks in seconds instead of hours. With this lib, you can create and build valid Gutenberg blocks that feature editable text, forms, inline and background images, as well as SVGs.
 
-## How it works
-
-This package is actually an alternative when AI fails converting it, which is usually very common.
-
-Most of the logic is just hard-coded patterns. It first converts from plain HTML to Jsx (using the `html-to-jsx` package), which is the supported format of Gutenberg. Then, it follows structured conversion rules that build the WordPress block, which is then validated and parsed using Babel.
-
 
 ## Features
 
@@ -49,8 +43,14 @@ Since it returns all files as either strings or source files, you can save them 
 - 🧰 **Built for automation and customization**
 Can be embedded in custom tools, UIs, or pipelines to generate Gutenberg blocks on demand.
 
-  
-## Process Overview
+## How it works
+
+This package is actually an alternative when AI fails converting it, which is usually very common.
+
+Most of the logic is just hard-coded patterns. It first converts from plain HTML to Jsx (using the `html-to-jsx` package), which is the supported format of Gutenberg. Then, it follows structured conversion rules that build the WordPress block, which is then validated and parsed using Babel.
+
+
+## The Building Process - An Overview
 
 
 Below is a visual overview of the block generation process:
@@ -58,23 +58,10 @@ Below is a visual overview of the block generation process:
 ![Block Generation Process](process.png)  
 
 
-## Environment Variables
-
-To use the screenshot preview feature, create a `.env` file in your project root:
-
-```
-SNAPAPI_KEY=sk_live_your_snapapi_key_here
-```
-
-You can get your SnapAPI key at [https://snapapi.pics/](https://snapapi.pics/).
-
-An example file is provided as `.env.example`.
+## Installation
 
   
-
 Install html-to-gutenberg with npm:
-
-  
 
 ```bash
 
@@ -106,21 +93,10 @@ const  htmlString = '<div>My content</div>';
   
 
 
-When provided with a valid HTML string and the required options, the block function will generate the necessary WordPress block files with the specified configuration. To install the block and its assets, simply load the generated folder into the plugins folder and activate it.
-
-If `generateIconPreview` is set to `true` and a `source` URL is provided, a `preview.jpeg` will be generated using SnapAPI and saved in your block's output folder.
-
+When provided with a valid HTML string with the desired options, the block function will generate the necessary WordPress block files with the specified configuration. To install the block and its assets, simply load the generated folder into the plugins folder and activate it as a plugin.
   
 
-## Example
-
-  
-
-[Working demo](https://www.html-to-gutenberg.io/)
-
-  
-
-## Options object reference
+## Options reference
 
 
 | Option              | Description                                                                                                                                           | Type     | Required?                                                                                          | Default            |
@@ -145,6 +121,7 @@ If `generateIconPreview` is set to `true` and a `source` URL is provided, a `pre
 To run the test suite, use:
 
 ```bash
+cd html-to-gutenberg && npm install
 npm test
 ```
 

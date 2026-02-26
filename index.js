@@ -1554,6 +1554,7 @@ const block = async (
         url: options.source,
         fullPage: true,
         delay: 4000,
+        blockAds: true,
         blockCookieBanners: true
       };
       const response = await fetch(snapApiUrl, {
