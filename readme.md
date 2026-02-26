@@ -14,7 +14,7 @@ Convert HTML strings to valid, editable WordPress Gutenberg blocks in seconds in
 
 Below is a visual overview of the block generation process:
 
-![Block Generation Process](img/process.png)
+![Block Generation Process](process.png)
 
 
 ## Screenshot Previews Powered by SnapAPI
