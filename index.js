@@ -1,10 +1,11 @@
+import fetch from 'node-fetch';
 import presetReact from '@babel/preset-react';
 import * as babel from '@babel/core';
 import * as cheerio from 'cheerio';
 import scopeCss from 'css-scoping';
 import extractAssets from 'fetch-page-assets';
 import fs from 'fs';
-import icon from 'html-screenshots';
+import dotenv from 'dotenv';
 import { createRequire } from 'module';
 import convert from 'node-html-to-jsx';
 import path from 'path';
@@ -1538,10 +1539,42 @@ const block = async (
     htmlContent = replaceRelativeUrlsInCssWithBase(htmlContent, source);
   }
   
-  try {
-    icon(htmlContent, { basePath: path.join(options.basePath, replaceUnderscoresSpacesAndUppercaseLetters(options.name)) });
-  } catch (error) {
-    console.log(`There was an error generating preview. ${error.message}`);
+
+
+  // Screenshot generation using SnapAPI
+  dotenv.config();
+  if (options.generateIconPreview && options.source) {
+    try {
+      const snapApiKey = process.env.SNAPAPI_KEY;
+      if (!snapApiKey) {
+        throw new Error('SNAPAPI_KEY is not set in environment variables.');
+      }
+      const snapApiUrl = 'https://api.snapapi.pics/v1/screenshot';
+      const snapApiBody = {
+        url: options.source,
+        fullPage: true,
+        delay: 4000,
+        blockAds: true,
+        blockCookieBanners: true
+      };
+      const response = await fetch(snapApiUrl, {
+        method: 'POST',
+        headers: {
+          'X-Api-Key': snapApiKey,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(snapApiBody)
+      });
+      if (!response.ok) {
+        throw new Error(`SnapAPI error: ${response.status}`);
+      }
+      const blob = await response.blob();
+      const previewPath = path.join(options.basePath, replaceUnderscoresSpacesAndUppercaseLetters(options.name), 'preview.jpeg');
+      const arrayBuffer = await blob.arrayBuffer();
+      fs.writeFileSync(previewPath, Buffer.from(arrayBuffer));
+    } catch (error) {
+      console.log(`There was an error generating preview with SnapAPI. ${error.message}`);
+    }
   }
 
   return saveFiles(await setupVariables(htmlContent, options));

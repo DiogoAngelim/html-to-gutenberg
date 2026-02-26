@@ -7,8 +7,9 @@
     "css-scoping": "^1.0.2",
     "fetch-page-assets": "^1.2.7",
     "fs": "^0.0.1-security",
-    "html-screenshots": "^1.2.9",
-    "image-to-base64": "^2.2.0",
+    "dotenv": "^16.4.5",
+    "node-fetch": "^3.3.2",
+    
     "node-html-to-jsx": "^1.4.1",
     "path": "^0.12.7"
   },
