@@ -6,18 +6,14 @@
 
   
 
-Convert HTML strings to valid, editable WordPress Gutenberg blocks in seconds instead of hours. With this script, you can create and build valid Gutenberg blocks that feature editable text, forms, inline and background images, as well as SVGs. It includes support for TailwindCSS.
+Convert HTML strings to valid, editable WordPress Gutenberg blocks in seconds instead of hours. With this lib, you can create and build valid Gutenberg blocks that feature editable text, forms, inline and background images, as well as SVGs.
 
+## How it works
 
+This package is actually an alternative when AI fails converting it, which is usually very common.
 
-## Screenshot Previews Powered by SnapAPI
+Most of the logic is just hard-coded patterns. It first converts from plain HTML to Jsx (using the `html-to-jsx` package), which is the supported format of Gutenberg. Then, it follows structured conversion rules that build the WordPress block, which is then validated and parsed using Babel.
 
-
-If you enable the `generateIconPreview` option, this package will generate a static JPEG preview of your block using the [SnapAPI](https://snapapi.pics/) screenshot service. You must provide a SnapAPI key in a `.env` file (see below).
-
-**Special thanks to [Alex Serebryakov](https://snapapi.pics/) for creating and maintaining SnapAPI!**
-
----
 
 ## Features
 
@@ -134,10 +130,14 @@ If `generateIconPreview` is set to `true` and a `source` URL is provided, a `pre
 | prefix              | A namespace prefix for the block name, typically aligned with your project (e.g., "wp" or "myplugins").                                              | string   | No                                                                                                  | wp                |
 | category            | The WordPress block category where the block appears in the editor. Use an existing one or register a custom category if needed.                    | string   | No                                                                                                  | common            |
 | basePath            | The absolute path where the output files and folders will be saved.                                                                                  | string   | No                                                                                                  | Current directory |
-| generateIconPreview | If `true`, generates a static image preview (JPEG) of the block's icon for display in the block picker using [SnapAPI](https://snapapi.pics/). Requires a valid API key in `.env`. | boolean  | No                                                                                                  | false             |
+| generateIconPreview | If you enable the `generateIconPreview` option by setting it to `true`, this package will generate a static image preview of your block using the [SnapAPI](https://snapapi.pics/) screenshot service. You must provide a SnapAPI key in a `.env` file (see below), which will display it a replacement for the block icons in the WP dashboard. | boolean  | No                                                                                                  | false             |
 | shouldSaveFiles     | When `true`, the generated block files are saved directly to disk. When `false`, returns an object containing the file contents as strings instead. | boolean  | No                                                                                                  | true              |
 | jsFiles             | An array of external JavaScript file URLs to enqueue with the block on the editor and the frontend. Useful for adding remote libraries.             | string[] | No                                                                                                  | []                |
 | cssFiles            | An array of external CSS file URLs to enqueue with the block on the editor and the frontend. Useful for adding additional remote stylesheets.        | string[] | No                                                                                                  | []                |
+
+
+
+**Special thanks to [Alex Serebryakov](https://snapapi.pics/) for creating and maintaining SnapAPI!**
 
 
 ## Running Tests
