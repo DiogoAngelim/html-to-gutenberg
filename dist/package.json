@@ -43,6 +43,7 @@
         "test": "test"
     },
     "scripts": {
+        "postinstall": "mv ./node_modules/fetch-page-assets/index.ts ./node_modules/fetch-page-assets/index.ts.bak || true",
         "test": "mocha -r ts-node/register index.test.ts",
         "build": "tsc",
         "coverage": "nyc mocha -r ts-node/register index.test.ts",
