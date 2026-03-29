@@ -1,6 +1,8 @@
-name: Sync NPM Packages
+name: Sync And Publish NPM Packages
 
 on:
+  release:
+    types: [published]
   workflow_dispatch:
     inputs:
       html_to_gutenberg_version:
@@ -19,16 +21,16 @@ on:
   schedule:
     - cron: '0 9 * * *'
 
-permissions:
-  contents: write
-
 concurrency:
   group: sync-npm
   cancel-in-progress: false
 
 jobs:
   sync:
+    if: github.event_name != 'release'
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -82,3 +84,54 @@ jobs:
       - name: Push changes
         if: steps.changes.outputs.changed == 'true'
         run: git push
+
+  publish_html_to_gutenberg:
+    if: github.event_name == 'release'
+    runs-on: ubuntu-latest
+    environment: .env
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          registry-url: 'https://registry.npmjs.org'
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build package
+        run: npm run build
+
+      - name: Run tests
+        run: npm test
+
+      - name: Publish to npm
+        run: npm publish --provenance
+
+  publish_fetch_page_assets:
+    if: github.event_name == 'release'
+    runs-on: ubuntu-latest
+    environment: .env
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          registry-url: 'https://registry.npmjs.org'
+
+      - name: Publish fetch-page-assets to npm
+        working-directory: vendor/fetch-page-assets
+        run: npm publish --provenance --access public
