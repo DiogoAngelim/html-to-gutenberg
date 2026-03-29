@@ -3,7 +3,7 @@ import presetReact from '@babel/preset-react';
 import * as babel from '@babel/core';
 import * as cheerio from 'cheerio';
 import scopeCss from 'css-scoping';
-import extractAssets from './vendor/fetch-page-assets/index.js';
+import extractAssets from 'fetch-page-assets';
 import fs from 'fs';
 import dotenv from 'dotenv';
 import { createRequire } from 'module';

@@ -13,7 +13,22 @@
     ],
     "esModuleInterop": true,
   },
+  "include": [
+    "@types.d.ts",
+    "globals.ts",
+    "utils.ts",
+    "src/**/*.ts"
+  ],
   "exclude": [
-    "node_modules"
+    "node_modules",
+    "dist",
+    "coverage",
+    "vendor",
+    "**/*.test.ts",
+    "index.ts",
+    "fetch-page-assets.test.ts",
+    "index.test.ts",
+    "coverage-demo.test.ts",
+    "snapapi-screenshot.test.ts"
   ]
 }

@@ -38,7 +38,7 @@
     "ts-node": "^10.9.2",
     "typescript-eslint": "^8.56.1"
   },
-  "types": "index.ts",
+  "types": "index.d.ts",
   "name": "html-to-gutenberg",
   "version": "4.2.9",
   "description": "Transform any valid HTML string into fully editable WP Gutenberg blocks in seconds rather than hours.",
