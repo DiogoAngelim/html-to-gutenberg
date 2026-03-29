@@ -48,10 +48,10 @@
   },
   "scripts": {
     "postinstall": "mv ./node_modules/fetch-page-assets/index.ts ./node_modules/fetch-page-assets/index.ts.bak || true && node ./scripts/patch-fetch-page-assets.mjs",
-    "test": "mocha -r ts-node/register index.test.ts fetch-page-assets.test.ts",
+    "test": "mocha -r ts-node/register/transpile-only index.test.ts fetch-page-assets.test.ts",
     "build": "tsc",
-    "coverage": "c8 mocha -r ts-node/register index.test.ts fetch-page-assets.test.ts",
-    "coveralls": "c8 mocha -r ts-node/register index.test.ts fetch-page-assets.test.ts && c8 report --reporter=lcov && cat coverage/lcov.info | coveralls"
+    "coverage": "c8 mocha -r ts-node/register/transpile-only index.test.ts fetch-page-assets.test.ts",
+    "coveralls": "c8 mocha -r ts-node/register/transpile-only index.test.ts fetch-page-assets.test.ts && c8 report --reporter=lcov && cat coverage/lcov.info | coveralls"
   },
   "repository": {
     "type": "git",

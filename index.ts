@@ -1,43 +1,59 @@
-// Utility functions exported for testing
-export function hasTailwindCdnSource(jsFiles: string[]): boolean {
-  const tailwindCdnRegex = /https:\/\/(cdn\.tailwindcss\.com(\?[^"'\s]*)?|cdn\.jsdelivr\.net\/npm\/@tailwindcss\/browser@4(\.\d+){0,2})/;
-  return jsFiles.some((url: string) => tailwindCdnRegex.test(url));
-}
+export type GeneratedFiles = Record<string, string>;
 
-export function replaceSourceUrlVars(str: string, source: any): string {
-  if (!source) return str;
-  const escapedSource = String(source).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-  const pattern = new RegExp(`var.url+'${escapedSource}([^']*)'`, 'g');
-  return str.replace(pattern, (match: string, path: string) => `\${vars.url}${path}`);
-}
+export type JobOutputFile = {
+  id: string;
+  name: string;
+  type: string;
+  size: number;
+  path: string;
+  url: string;
+  kind: 'source' | 'asset' | 'bundle';
+};
 
-// ...existing code...
+export type JobBundle = {
+  id: string;
+  name: string;
+  type: string;
+  size: number;
+  path: string;
+  url: string;
+  zipUrl: string;
+};
 
-// Export the main block function as default
-// (Moved block implementation from index.js below)
+export type JobManifest = {
+  jobId: string;
+  status: 'completed';
+  output: {
+    files: JobOutputFile[];
+    bundle: JobBundle;
+  };
+};
 
-import fetch from 'node-fetch';
-import presetReact from '@babel/preset-react';
-import * as babel from '@babel/core';
-import * as cheerio from 'cheerio';
-import scopeCss from 'css-scoping';
-import extractAssets from 'fetch-page-assets';
-import fs from 'fs';
-import dotenv from 'dotenv';
-import pkg from './package.json';
-import convert from 'node-html-to-jsx';
-import path from 'path';
-
-import {
-  imports,
-  images,
-  characters
-} from './globals.js';
-
-const { version } = pkg;
+export type NormalizedBlockOptions = {
+  title: string;
+  name: string;
+  slug: string;
+  namespace: string;
+  prefix: string;
+  baseUrl: string | null;
+  source: string | null;
+  category: string;
+  registerCategoryIfMissing: boolean;
+  outputPath: string;
+  basePath: string;
+  writeFiles: boolean;
+  shouldSaveFiles: boolean;
+  generatePreviewImage: boolean;
+  generateIconPreview: boolean;
+  jsFiles: string[];
+  cssFiles: string[];
+  outputMode: 'job' | 'legacy';
+  uploadToR2: boolean;
+  jobId?: string;
+};
 
 export type BlockOptions = {
-  title: string;
+  title?: string;
   slug?: string;
   baseUrl?: string | null;
   namespace?: string;
@@ -59,22 +75,99 @@ export type BlockOptions = {
   generateIconPreview?: boolean;
 };
 
-const block = async (
-  htmlContent: string,
-  options: BlockOptions = {
-    title: 'My block',
-    namespace: 'wp',
-    category: 'common',
-    outputPath: process.cwd(),
-    writeFiles: false,
-    generatePreviewImage: false,
-    jsFiles: [],
-    cssFiles: [],
-    baseUrl: null,
-  }
-) => {
-  // ...existing block implementation from index.js...
+export declare const createProfiler: (enabled: boolean) => {
+  start(label: string): void;
+  end(label: string): void;
 };
 
-export default block;
+export declare const findSelfClosingJsxEnd: (
+  content: string,
+  startIndex: number
+) => number;
 
+export declare const replaceSelfClosingJsxComponent: (
+  content: string,
+  componentName: string,
+  replacer: (componentSource: string) => string
+) => string;
+
+export declare const getMediaUploadSaveTemplate: (
+  image?: {
+    randomUrlVariable: string;
+    randomAltVariable: string;
+    imgClass?: string;
+  }
+) => string;
+
+export declare const replaceMediaUploadComponents: (
+  content: string,
+  imageRegistry: Array<{
+    randomUrlVariable: string;
+    randomAltVariable: string;
+    imgClass?: string;
+  }>
+) => string;
+
+export declare const replaceRichTextComponents: (content: string) => string;
+
+export declare const buildAssetExtractionOptions: (
+  basePath: string,
+  options?: {
+    uploadToR2?: boolean;
+    returnDetails?: boolean;
+    jobId?: string;
+    r2Prefix?: string;
+  }
+) => {
+  basePath: string;
+  saveFile: false;
+  verbose: false;
+  maxRetryAttempts: 1;
+  retryDelay: 0;
+  concurrency: 8;
+  uploadToR2: boolean;
+  returnDetails: boolean;
+  jobId?: string;
+  r2Prefix?: string;
+};
+
+export declare const slugifyBlockValue: (value?: string) => string;
+export declare const formatCategoryLabel: (category?: string) => string;
+export declare const normalizeBlockOptions: (
+  options?: BlockOptions
+) => NormalizedBlockOptions;
+
+export declare const replaceRelativeUrls: (
+  html: string,
+  replacer: (url: string) => string
+) => string;
+
+export declare const replaceRelativeUrlsInCss: (
+  css: string,
+  replacer: (url: string) => string
+) => string;
+
+export declare const replaceRelativeUrlsInHtml: (
+  html: string,
+  baseUrl: string
+) => string;
+
+export declare const replaceRelativeUrlsInCssWithBase: (
+  css: string,
+  cssFileUrl: string
+) => string;
+
+export declare const unwrapBody: (code: string) => string;
+
+export declare const transformBlockFile: (
+  blockCode: string
+) => { code?: string } | string;
+
+export declare const getSnapApiUrl: () => string;
+
+declare const block: (
+  htmlContent: string,
+  options?: BlockOptions
+) => Promise<GeneratedFiles | JobManifest>;
+
+export default block;
