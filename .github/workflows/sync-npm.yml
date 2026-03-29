@@ -1,14 +1,18 @@
-name: Sync NPM Package
+name: Sync NPM Packages
 
 on:
   workflow_dispatch:
     inputs:
-      version:
-        description: Specific npm version to sync. Leave empty to use the dist-tag.
+      html_to_gutenberg_version:
+        description: Specific html-to-gutenberg npm version to sync. Leave empty to use the dist-tag.
+        required: false
+        type: string
+      fetch_page_assets_version:
+        description: Specific fetch-page-assets npm version to sync. Leave empty to use the dist-tag.
         required: false
         type: string
       dist_tag:
-        description: npm dist-tag to sync when no version is provided.
+        description: npm dist-tag to sync when no explicit version is provided.
         required: false
         default: latest
         type: string
@@ -36,11 +40,19 @@ jobs:
         with:
           node-version: '20'
 
-      - name: Sync repository from npm
+      - name: Sync html-to-gutenberg from npm
         env:
-          NPM_SYNC_VERSION: ${{ inputs.version }}
+          NPM_SYNC_VERSION: ${{ inputs.html_to_gutenberg_version }}
           NPM_SYNC_DIST_TAG: ${{ inputs.dist_tag }}
-          NPM_SYNC_PRESERVE_PATHS: .git,.github,node_modules,.env,scripts
+          NPM_SYNC_PRESERVE_PATHS: .git,.github,node_modules,.env,scripts,vendor
+        run: node ./scripts/sync-from-npm.mjs
+
+      - name: Sync fetch-page-assets from npm
+        env:
+          NPM_PACKAGE_NAME: fetch-page-assets
+          NPM_SYNC_TARGET_DIR: vendor/fetch-page-assets
+          NPM_SYNC_VERSION: ${{ inputs.fetch_page_assets_version }}
+          NPM_SYNC_DIST_TAG: ${{ inputs.dist_tag }}
         run: node ./scripts/sync-from-npm.mjs
 
       - name: Detect changes
@@ -54,8 +66,10 @@ jobs:
 
       - name: Read synced version
         if: steps.changes.outputs.changed == 'true'
-        id: version
-        run: echo "value=$(node -p \"require('./package.json').version\")" >> "$GITHUB_OUTPUT"
+        id: versions
+        run: |
+          echo "html_to_gutenberg=$(node -p \"require('./package.json').version\")" >> "$GITHUB_OUTPUT"
+          echo "fetch_page_assets=$(node -p \"require('./vendor/fetch-page-assets/package.json').version\")" >> "$GITHUB_OUTPUT"
 
       - name: Commit changes
         if: steps.changes.outputs.changed == 'true'
@@ -63,7 +77,7 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add -A
-          git commit -m "chore: sync npm package v${{ steps.version.outputs.value }}"
+          git commit -m "chore: sync npm packages html-to-gutenberg v${{ steps.versions.outputs.html_to_gutenberg }} and fetch-page-assets v${{ steps.versions.outputs.fetch_page_assets }}"
 
       - name: Push changes
         if: steps.changes.outputs.changed == 'true'

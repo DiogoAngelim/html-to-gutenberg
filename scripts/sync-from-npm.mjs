@@ -5,9 +5,11 @@ import { execFileSync } from 'child_process';
 
 const repoRoot = process.cwd();
 const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'sync-from-npm-'));
+const targetDir = process.env.NPM_SYNC_TARGET_DIR?.trim() || '.';
+const targetRoot = path.resolve(repoRoot, targetDir);
 
 const readPackageName = () => {
-  const packageJsonPath = path.join(repoRoot, 'package.json');
+  const packageJsonPath = path.join(targetRoot, 'package.json');
   const packageJson = JSON.parse(fs.readFileSync(packageJsonPath, 'utf8'));
   return packageJson.name;
 };
@@ -26,12 +28,16 @@ const shouldPreserve = (entryName, preserveList) => {
 };
 
 const removeUnsyncedEntries = (sourceRoot, preserveList, dryRun) => {
-  for (const entry of fs.readdirSync(repoRoot)) {
+  if (!fs.existsSync(targetRoot)) {
+    return;
+  }
+
+  for (const entry of fs.readdirSync(targetRoot)) {
     if (shouldPreserve(entry, preserveList)) {
       continue;
     }
 
-    const targetPath = path.join(repoRoot, entry);
+    const targetPath = path.join(targetRoot, entry);
     const sourcePath = path.join(sourceRoot, entry);
 
     if (fs.existsSync(sourcePath)) {
@@ -48,6 +54,10 @@ const removeUnsyncedEntries = (sourceRoot, preserveList, dryRun) => {
 };
 
 const copyPackageEntries = (sourceRoot, preserveList, dryRun) => {
+  if (!dryRun) {
+    fs.mkdirSync(targetRoot, { recursive: true });
+  }
+
   for (const entry of fs.readdirSync(sourceRoot)) {
     if (shouldPreserve(entry, preserveList)) {
       console.log(`Skipping preserved path ${entry}`);
@@ -55,7 +65,7 @@ const copyPackageEntries = (sourceRoot, preserveList, dryRun) => {
     }
 
     const sourcePath = path.join(sourceRoot, entry);
-    const targetPath = path.join(repoRoot, entry);
+    const targetPath = path.join(targetRoot, entry);
 
     if (dryRun) {
       console.log(`Would sync ${entry}`);
@@ -75,7 +85,7 @@ const dryRun = process.env.NPM_SYNC_DRY_RUN === '1';
 const packageSpec = requestedVersion ? `${packageName}@${requestedVersion}` : `${packageName}@${distTag}`;
 
 try {
-  console.log(`Packing ${packageSpec}`);
+  console.log(`Packing ${packageSpec} into ${targetDir}`);
   const packedTarball = execFileSync('npm', ['pack', packageSpec, '--silent'], {
     cwd: tempRoot,
     encoding: 'utf8',
@@ -99,7 +109,7 @@ try {
     fs.readFileSync(path.join(sourceRoot, 'package.json'), 'utf8')
   );
 
-  console.log(`Synced ${packageName} version ${syncedPackageJson.version}`);
+  console.log(`Synced ${packageName} version ${syncedPackageJson.version} into ${targetDir}`);
 } finally {
   fs.rmSync(tempRoot, { recursive: true, force: true });
 }
