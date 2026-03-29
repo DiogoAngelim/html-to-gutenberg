@@ -40,7 +40,7 @@
   },
   "types": "index.d.ts",
   "name": "html-to-gutenberg",
-  "version": "4.2.9",
+  "version": "4.2.10",
   "description": "Transform any valid HTML string into fully editable WP Gutenberg blocks in seconds rather than hours.",
   "main": "index.js",
   "directories": {
