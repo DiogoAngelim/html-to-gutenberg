@@ -121,7 +121,8 @@ jobs:
         id: bump_version
         run: |
           npm version patch --no-git-tag-version
-          echo "package_version=$(node -p \"require('./package.json').version\")" >> "$GITHUB_OUTPUT"
+          PACKAGE_VERSION=$(node -e "console.log(require('./package.json').version)")
+          echo "package_version=$PACKAGE_VERSION" >> "$GITHUB_OUTPUT"
 
       - name: Check published version
         id: version_check
