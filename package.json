@@ -1,5 +1,6 @@
 {
   "dependencies": {
+    "@aws-sdk/client-s3": "^3.888.0",
     "@babel/core": "^7.29.0",
     "@babel/preset-react": "^7.28.5",
     "@svgr/core": "^8.1.0",
@@ -8,6 +9,8 @@
     "dotenv": "^17.3.1",
     "fetch-page-assets": "^1.2.7",
     "fs": "^0.0.1-security",
+    "jszip": "^3.10.1",
+    "mime-types": "^3.0.1",
     "node-fetch": "^3.3.2",
     "node-html-to-jsx": "^1.4.4",
     "path": "^0.12.7"
@@ -25,6 +28,7 @@
     "@typescript-eslint/eslint-plugin": "^8.56.1",
     "@typescript-eslint/parser": "^8.56.1",
     "chai": "^6.2.2",
+    "c8": "^11.0.0",
     "coveralls": "^3.1.1",
     "eslint": "^10.0.2",
     "mocha": "^11.3.0",
@@ -36,18 +40,18 @@
   },
   "types": "index.ts",
   "name": "html-to-gutenberg",
-  "version": "4.2.8",
+  "version": "4.2.9",
   "description": "Transform any valid HTML string into fully editable WP Gutenberg blocks in seconds rather than hours.",
   "main": "index.js",
   "directories": {
     "test": "test"
   },
   "scripts": {
-    "postinstall": "mv ./node_modules/fetch-page-assets/index.ts ./node_modules/fetch-page-assets/index.ts.bak || true",
-    "test": "mocha -r ts-node/register index.test.ts",
+    "postinstall": "mv ./node_modules/fetch-page-assets/index.ts ./node_modules/fetch-page-assets/index.ts.bak || true && node ./scripts/patch-fetch-page-assets.mjs",
+    "test": "mocha -r ts-node/register index.test.ts fetch-page-assets.test.ts",
     "build": "tsc",
-    "coverage": "nyc mocha -r ts-node/register index.test.ts",
-    "coveralls": "nyc mocha -r ts-node/register index.test.ts && nyc report --reporter=lcov && cat coverage/lcov.info | coveralls"
+    "coverage": "c8 mocha -r ts-node/register index.test.ts fetch-page-assets.test.ts",
+    "coveralls": "c8 mocha -r ts-node/register index.test.ts fetch-page-assets.test.ts && c8 report --reporter=lcov && cat coverage/lcov.info | coveralls"
   },
   "repository": {
     "type": "git",
@@ -72,28 +76,25 @@
     "url": "https://github.com/DiogoAngelim/html-to-gutenberg/issues"
   },
   "homepage": "https://www.html-to-gutenberg.io",
-  "nyc": {
+  "c8": {
     "reporter": [
-      "lcov",
-      "text"
-    ],
-    "exclude": [
-      "coverage"
+      "text",
+      "lcov"
     ],
     "include": [
-      "src/*.ts",
-      "src/**/*.ts"
+      "index.js",
+      "utils.ts",
+      "globals.js",
+      "vendor/fetch-page-assets/index.js"
     ],
-    "extension": [
-      ".ts",
-      ".js"
+    "exclude": [
+      "coverage",
+      "dist",
+      "node_modules",
+      "scripts",
+      "**/*.test.ts"
     ],
-    "all": true,
-    "sourceMap": true,
-    "instrument": true,
-    "require": [
-      "ts-node/register"
-    ]
+    "all": true
   },
   "jest": {
     "preset": "ts-jest/presets/js-with-ts",

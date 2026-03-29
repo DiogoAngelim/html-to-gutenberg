@@ -3,12 +3,19 @@ import presetReact from '@babel/preset-react';
 import * as babel from '@babel/core';
 import * as cheerio from 'cheerio';
 import scopeCss from 'css-scoping';
-import extractAssets from 'fetch-page-assets';
+import extractAssets from './vendor/fetch-page-assets/index.js';
 import fs from 'fs';
 import dotenv from 'dotenv';
 import { createRequire } from 'module';
 import convert from 'node-html-to-jsx';
 import path from 'path';
+import {
+  createFileRecord,
+  createJobId,
+  inferContentType,
+  uploadBufferToR2,
+  zipEntriesToBuffer,
+} from './r2.js';
 
 import {
   imports,
@@ -19,32 +26,411 @@ import {
 const require = createRequire(import.meta.url);
 const { version } = require('./package.json');
 
+export const createProfiler = (enabled) => {
+  const marks = new Map();
+
+  return {
+    start(label) {
+      if (enabled) {
+        marks.set(label, process.hrtime.bigint());
+      }
+    },
+    end(label) {
+      if (enabled && marks.has(label)) {
+        const start = marks.get(label);
+        const elapsedMs = Number(process.hrtime.bigint() - start) / 1e6;
+        console.log(`[profile] ${label}: ${elapsedMs.toFixed(2)}ms`);
+        marks.delete(label);
+      }
+    },
+  };
+};
+
+export const findSelfClosingJsxEnd = (content, startIndex) => {
+  let inSingleQuote = false;
+  let inDoubleQuote = false;
+  let inTemplateQuote = false;
+  let braceDepth = 0;
+  let parenDepth = 0;
+
+  for (let i = startIndex; i < content.length - 1; i++) {
+    const char = content[i];
+    const next = content[i + 1];
+    const prev = i > 0 ? content[i - 1] : '';
+    const escaped = prev === '\\';
+
+    if (!escaped) {
+      if (!inDoubleQuote && !inTemplateQuote && char === '\'') {
+        inSingleQuote = !inSingleQuote;
+        continue;
+      }
+      if (!inSingleQuote && !inTemplateQuote && char === '"') {
+        inDoubleQuote = !inDoubleQuote;
+        continue;
+      }
+      if (!inSingleQuote && !inDoubleQuote && char === '`') {
+        inTemplateQuote = !inTemplateQuote;
+        continue;
+      }
+    }
+
+    if (inSingleQuote || inDoubleQuote || inTemplateQuote) {
+      continue;
+    }
+
+    if (char === '{') {
+      braceDepth++;
+      continue;
+    }
+
+    if (char === '}') {
+      braceDepth = Math.max(0, braceDepth - 1);
+      continue;
+    }
+
+    if (char === '(') {
+      parenDepth++;
+      continue;
+    }
+
+    if (char === ')') {
+      parenDepth = Math.max(0, parenDepth - 1);
+      continue;
+    }
+
+    if (char === '/' && next === '>' && braceDepth === 0 && parenDepth === 0) {
+      return i + 2;
+    }
+  }
+
+  return -1;
+};
+
+export const replaceSelfClosingJsxComponent = (content, componentName, replacer) => {
+  const openTag = `<${componentName}`;
+
+  if (!content.includes(openTag)) {
+    return content;
+  }
+
+  let cursor = 0;
+  let result = '';
+
+  while (cursor < content.length) {
+    const start = content.indexOf(openTag, cursor);
+
+    if (start === -1) {
+      result += content.slice(cursor);
+      break;
+    }
+
+    result += content.slice(cursor, start);
+    const end = findSelfClosingJsxEnd(content, start);
+
+    if (end === -1) {
+      result += content.slice(start);
+      break;
+    }
+
+    result += replacer(content.slice(start, end));
+    cursor = end;
+  }
+
+  return result;
+};
+
+export const getMediaUploadSaveTemplate = (image) => {
+  if (!image) {
+    return '';
+  }
+
+  const { randomUrlVariable, randomAltVariable, imgClass } = image;
+  const classNameAttr = imgClass ? ` className="${imgClass}"` : '';
+
+  return `<img src={attributes.${randomUrlVariable}} alt={attributes.${randomAltVariable}}${classNameAttr} />`;
+};
+
+export const replaceMediaUploadComponents = (content, imageRegistry) => {
+  let imageIndex = 0;
+
+  return replaceSelfClosingJsxComponent(content, 'MediaUpload', () => {
+    const template = getMediaUploadSaveTemplate(imageRegistry[imageIndex]);
+    imageIndex++;
+    return template;
+  });
+};
+
+export const replaceRichTextComponents = (content) => {
+  return replaceSelfClosingJsxComponent(content, 'RichText', (componentSource) => {
+    const valueMatch = componentSource.match(/\bvalue=\{([^}]+)\}/);
+
+    if (!valueMatch) {
+      return componentSource;
+    }
+
+    return `<RichText.Content value={${valueMatch[1]}} />`;
+  });
+};
+
+export const buildAssetExtractionOptions = (basePath, options = {}) => ({
+  basePath,
+  saveFile: false,
+  verbose: false,
+  maxRetryAttempts: 1,
+  retryDelay: 0,
+  concurrency: 8,
+  uploadToR2: options.uploadToR2 || false,
+  returnDetails: options.returnDetails || false,
+  jobId: options.jobId,
+  r2Prefix: options.r2Prefix,
+});
+
+export const slugifyBlockValue = (value = '') => {
+  return String(value)
+    .replace(/\W|_/g, '-')
+    .replace(/-+/g, '-')
+    .replace(/^-|-$/g, '')
+    .toLowerCase();
+};
+
+export const formatCategoryLabel = (category = '') => {
+  return String(category)
+    .split(/[-_\s]+/)
+    .filter(Boolean)
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .join(' ');
+};
+
+export const normalizeBlockOptions = (options = {}) => {
+  const hasOwn = (key) => Object.prototype.hasOwnProperty.call(options, key);
+  const title = options.title ?? options.name ?? 'My block';
+  const slug = slugifyBlockValue(options.slug ?? title) || 'my-block';
+  const namespace = options.namespace ?? options.prefix ?? 'wp';
+  const baseUrl = options.baseUrl ?? options.source ?? null;
+  const outputPath = options.outputPath ?? options.basePath ?? process.cwd();
+  const hasExplicitLocalOutputPreference =
+    hasOwn('writeFiles') ||
+    hasOwn('outputPath') ||
+    hasOwn('shouldSaveFiles') ||
+    hasOwn('basePath');
+  const hasExplicitJobPreference = hasOwn('uploadToR2') || hasOwn('jobId');
+  const outputMode =
+    options.outputMode ??
+    (hasExplicitJobPreference ? 'job' : hasExplicitLocalOutputPreference ? 'legacy' : 'job');
+  const writeFiles = options.writeFiles ?? options.shouldSaveFiles ?? (outputMode === 'legacy');
+  const generatePreviewImage =
+    options.generatePreviewImage ?? options.generateIconPreview ?? false;
+
+  return {
+    ...options,
+    title,
+    name: title,
+    slug,
+    namespace,
+    prefix: namespace,
+    baseUrl,
+    source: baseUrl,
+    category: options.category ?? 'common',
+    registerCategoryIfMissing: options.registerCategoryIfMissing ?? false,
+    outputPath,
+    basePath: outputPath,
+    writeFiles,
+    shouldSaveFiles: writeFiles,
+    generatePreviewImage,
+    generateIconPreview: generatePreviewImage,
+    jsFiles: options.jsFiles ?? [],
+    cssFiles: options.cssFiles ?? [],
+    outputMode,
+    uploadToR2: options.uploadToR2 ?? outputMode === 'job',
+    jobId: options.jobId,
+  };
+};
+
+export const replaceRelativeUrls = (html, replacer) => {
+  const urlAttributes = [
+    'src', 'href', 'action', 'srcset', 'poster', 'data', 'formaction'
+  ];
+
+  const regex = new RegExp(
+    `\\b(${urlAttributes.join('|')}|data-[a-zA-Z0-9_-]+)\\s*=\\s*(['"])(?!https?:|//|mailto:|tel:|#)([^'"]+)\\2`,
+    'gi'
+  );
+
+  return html.replace(regex, (_match, attr, quote, url) => {
+    const newUrl = replacer(url);
+    return `${attr}=${quote}${newUrl}${quote}`;
+  });
+};
+
+export const replaceRelativeUrlsInCss = (css, replacer) => {
+  const regex = /url\(\s*(['"]?)(.+?)\1\s*\)/gi;
+
+  return css.replace(regex, (match, quote, url) => {
+    if (/^(https?:|\/\/|data:|mailto:|tel:|#)/.test(url.trim())) {
+      return match;
+    }
+
+    const newUrl = replacer(url);
+    return `url(${quote}${newUrl}${quote})`;
+  });
+};
+
+export const replaceRelativeUrlsInHtml = (html, baseUrl) => {
+  return replaceRelativeUrls(html, (url) => {
+    return new URL(url, baseUrl).href;
+  });
+};
+
+export const replaceRelativeUrlsInCssWithBase = (css, cssFileUrl) => {
+  return replaceRelativeUrlsInCss(css, (url) => {
+    return new URL(url, cssFileUrl).href;
+  });
+};
+
+export const unwrapBody = (code) => {
+  try {
+    return code.replace(/<\/?(html|body)[^>]*>/gi, '');
+  } catch (_error) {
+    return code;
+  }
+};
+
+export const transformBlockFile = (blockCode) => {
+  let transformedCode = '';
+
+  try {
+    transformedCode = babel.transformSync(blockCode, {
+      presets: [[presetReact, { pragma: 'wp.element.createElement' }]],
+      filename: 'block.js'
+    });
+  } catch (error) {
+    console.log(error);
+  }
+
+  return transformedCode;
+};
+
+export const getSnapApiUrl = () => {
+  return process.env.SNAPAPI_URL || 'https://api.snapapi.pics/v1/screenshot';
+};
+
+const uploadJobPackage = async ({ jobId, generatedFiles, assetFiles, previewArtifact }) => {
+  const allFiles = [];
+  const zipEntries = [];
+  let sourceIndex = 1;
+  let assetIndex = 1;
+
+  for (const [name, contents] of Object.entries(generatedFiles)) {
+    const body = typeof contents === 'string' ? Buffer.from(contents, 'utf8') : Buffer.from(contents || '');
+    const storageKey = `generated/${jobId}/${name}`;
+    const uploadResult = await uploadBufferToR2({
+      storageKey,
+      body,
+      contentType: inferContentType(name),
+    });
+
+    allFiles.push(
+      createFileRecord({
+        id: `file_${sourceIndex++}`,
+        name,
+        kind: 'source',
+        storageKey: uploadResult.storageKey,
+        size: uploadResult.size,
+        type: uploadResult.type,
+        url: uploadResult.url,
+      })
+    );
+
+    zipEntries.push({ name, body });
+  }
+
+  for (const assetFile of assetFiles) {
+    allFiles.push({
+      id: `file_${sourceIndex + assetIndex - 1}`,
+      name: assetFile.name,
+      type: assetFile.type,
+      size: assetFile.size,
+      path: assetFile.path,
+      url: assetFile.url,
+      kind: assetFile.kind || 'asset',
+    });
+
+    if (assetFile.buffer) {
+      zipEntries.push({
+        name: path.posix.relative(`generated/${jobId}`, assetFile.path.replace(/^\//, '')),
+        body: assetFile.buffer,
+      });
+    }
+
+    assetIndex++;
+  }
+
+  if (previewArtifact) {
+    allFiles.push(previewArtifact.file);
+    zipEntries.push({
+      name: previewArtifact.file.name,
+      body: previewArtifact.buffer,
+    });
+  }
+
+  const zipBuffer = await zipEntriesToBuffer(zipEntries);
+  const bundleUpload = await uploadBufferToR2({
+    storageKey: `generated/${jobId}/output.zip`,
+    body: zipBuffer,
+    contentType: 'application/zip',
+  });
+  const bundleFile = createFileRecord({
+    id: 'file_bundle',
+    name: 'output.zip',
+    kind: 'bundle',
+    storageKey: bundleUpload.storageKey,
+    size: bundleUpload.size,
+    type: bundleUpload.type,
+    url: bundleUpload.url,
+  });
+
+  return {
+    jobId,
+    status: 'completed',
+    output: {
+      files: allFiles,
+      bundle: {
+        id: bundleFile.id,
+        name: bundleFile.name,
+        type: bundleFile.type,
+        size: bundleFile.size,
+        path: bundleFile.path,
+        url: bundleFile.url,
+        zipUrl: bundleUpload.url,
+      },
+    },
+  };
+};
+
 const block = async (
   htmlContent,
-  options = {
-    name: 'My block',
-    prefix: 'wp',
-    category: 'common',
-    basePath: process.cwd(),
-    shouldSaveFiles: true,
-    generateIconPreview: false,
-    jsFiles: [],
-    cssFiles: [],
-    source: null,
-  }
+  rawOptions = {}
 ) => {
+  const options = normalizeBlockOptions(rawOptions);
   const panels = [];
   const styles = [];
   const scripts = [];
   const attributes = {};
   const formVars = {};
+  const extractedAssets = [];
+  images.length = 0;
 
-  const { name, prefix, source } = options;
+  const { name, prefix, source, slug, registerCategoryIfMissing } = options;
+  const outputMode = options.outputMode;
+  const useR2Storage = options.uploadToR2;
+  const jobId = options.jobId || createJobId();
 
   let js = '';
   let css = '';
   let phpEmailData = '';
   let emailTemplate = '';
+  let previewArtifact = null;
+  const profiler = createProfiler(process.env.HTG_PROFILE === '1');
 
   function hasTailwindCdnSource(jsFiles) {
     const tailwindCdnRegex = /https:\/\/(cdn\.tailwindcss\.com(\?[^"'\s]*)?|cdn\.jsdelivr\.net\/npm\/@tailwindcss\/browser@4(\.\d+){0,2})/;
@@ -78,9 +464,7 @@ const block = async (
       .replace(/^[^a-z]+/, '');
   }
    
-  const replaceUnderscoresSpacesAndUppercaseLetters = (name = '') => {
-    return name.replace(new RegExp(/\W|_/, 'g'), '-').toLowerCase();
-  };
+  const replaceUnderscoresSpacesAndUppercaseLetters = (name = '') => slugifyBlockValue(name);
 
   const saveFile = (fileName, contents, options) => {
     try {
@@ -93,50 +477,6 @@ const block = async (
       logError(error);
     }
   };
-
-  function replaceRelativeUrls(html, replacer) {
-    const urlAttributes = [
-      'src', 'href', 'action', 'srcset', 'poster', 'data', 'formaction'
-    ];
-  
-    const regex = new RegExp(
-      `\\b(${urlAttributes.join('|')}|data-[a-zA-Z0-9_-]+)\\s*=\\s*(['"])(?!https?:|//|mailto:|tel:|#)([^'"]+)\\2`,
-      'gi'
-    );
-  
-    return html.replace(regex, (_match, attr, quote, url) => {
-      const newUrl = replacer(url);
-      return `${attr}=${quote}${newUrl}${quote}`;
-    });
-  }
-  
-
-  function replaceRelativeUrlsInCss(css, replacer) {
-    const regex = /url\(\s*(['"]?)(.+?)\1\s*\)/gi;
-
-    return css.replace(regex, (match, quote, url) => {
-      if (/^(https?:|\/\/|data:|mailto:|tel:|#)/.test(url.trim())) {
-        return match;
-      }
-      const newUrl = replacer(url);
-      return `url(${quote}${newUrl}${quote})`;
-    });
-  }
-  
-  function replaceRelativeUrlsInHtml(html, baseUrl) {
-    return replaceRelativeUrls(html, (url) => {
-      return new URL(url, baseUrl).href;
-    });
-  }
-
-  function replaceRelativeUrlsInCssWithBase(css, cssFileUrl) {
-    return replaceRelativeUrlsInCss(css, (url) => {
-      if (/^(https?:|\/\/|data:|mailto:|tel:|#)/.test(url.trim())) {
-        return url;
-      }
-      return new URL(url, cssFileUrl).href;
-    });
-  }  
 
   const parseRequirements = async (files, options) => {
     const { source } = options;
@@ -173,9 +513,10 @@ const block = async (
     return '';
   };
 
-  const newName = replaceUnderscoresSpacesAndUppercaseLetters(name);
-  const blockName = `${sanitizeAndReplaceLeadingNumbers(replaceUnderscoresSpacesAndUppercaseLetters(prefix))}/${sanitizeAndReplaceLeadingNumbers(replaceUnderscoresSpacesAndUppercaseLetters(name))}`;
-  const blockNameHandle = `${prefix}-${newName}`;
+  const newName = slug;
+  const normalizedNamespace = replaceUnderscoresSpacesAndUppercaseLetters(prefix);
+  const blockName = `${sanitizeAndReplaceLeadingNumbers(normalizedNamespace)}/${sanitizeAndReplaceLeadingNumbers(newName)}`;
+  const blockNameHandle = `${normalizedNamespace}-${newName}`;
 
   const getPhp = (options) => {
     const { name, prefix, jsFiles, cssFiles } = options;
@@ -386,40 +727,6 @@ const block = async (
   `;
   };
 
-  function preprocessSvgAttributes(code) {
-    return code.replace(/(<svg[\s\S]*?>[\s\S]*?<\/svg>)/gi, (svgBlock) => {
-      let processed = svgBlock.replace(/([a-zA-Z0-9]+)-([a-zA-Z0-9]+)=/g, (match, p1, p2) => {
-        const camel = p1 + p2.charAt(0).toUpperCase() + p2.slice(1);
-        return camel + '=';
-      });
-      return processed;
-    });
-  }
-
-  function unwrapBody(code) {
-    try {
-      return code.replace(/<\/?(html|body)[^>]*>/gi, '');
-    } catch (e) {
-      return code;
-    }
-  }
-
-  function transformBlockFile(blockCode) {    
-    let test = '';
-    
-    try {
-      test = babel.transformSync(blockCode, {
-      presets: [[presetReact, { pragma: 'wp.element.createElement' }]],
-      filename: 'block.js'
-    });
-    } catch (error) {
-      console.log(error);
-      
-    }
-
-    return test;
-  }
-  
   const saveFiles = async (options) => {
     const { cssFiles = [], jsFiles = [], shouldSaveFiles, name, prefix } = options;
     const tailwindRegex = /(class|className)\s*=\s*["'][^"']*\b(items-center|justify-center|gap-\d+|rounded(-[a-z]+)?|text-[a-z]+-\d{3}|bg-[a-z]+-\d{3}|w-(full|screen)|h-(full|screen)|max-w-[\w\[\]-]+|p-\d+|m-\d+)\b[^"']*["']/i;
@@ -448,8 +755,9 @@ const block = async (
     .replace(/<script[\s\S]*?<\/script>/gi, '')
     .replace(/<style[\s\S]*?<\/style>/gi, '');
 
-
+    profiler.start('getBlock');
     let blockCode = await getBlock(options);
+    profiler.end('getBlock');
 
     // Ensure all <img> tags are self-closing for valid JSX
     blockCode = blockCode.replace(/<img([^>/]*?)>/g, '<img$1 />');
@@ -458,34 +766,31 @@ const block = async (
     const indexFile = getPhp(options);
     let blockFile = '';
 
-    try {
-      blockFile = transformBlockFile(blockCode).code
-        ?.replace(/name: \"\{field.name\}\"/g, 'name: field.name')
-        ?.replace(/key: \"\{index\}\"/g, 'key: index');
-    } catch (error) {
-      console.log(error);
-    }
+    profiler.start('transformBlockFile');
+    blockFile = transformBlockFile(blockCode).code
+      ?.replace(/name: \"\{field.name\}\"/g, 'name: field.name')
+      ?.replace(/key: \"\{index\}\"/g, 'key: index');
+    profiler.end('transformBlockFile');
     
-    if (shouldSaveFiles) {
-      try {
-        saveFile('style.css', scopedCssFrontend, options);
-        saveFile('editor.css', editorStyleFile, options);
-        saveFile('scripts.js', `${scriptFile}\n\n${emailTemplate}`, options);
-        saveFile('index.php', indexFile, options);
-        saveFile('block.js', blockFile, options);
-        saveFile('remote-loader.js', '', options);
-      } catch (error) {
-        console.log(error);
-        
-      }
+    const finalScriptsFile = `${scriptFile}\n\n${emailTemplate}`;
+    const remoteLoaderFile = '';
+
+    if (shouldSaveFiles && outputMode === 'legacy') {
+      saveFile('style.css', scopedCssFrontend, options);
+      saveFile('editor.css', editorStyleFile, options);
+      saveFile('scripts.js', finalScriptsFile, options);
+      saveFile('index.php', indexFile, options);
+      saveFile('block.js', blockFile, options);
+      saveFile('remote-loader.js', remoteLoaderFile, options);
     }
 
     return {
       'style.css': scopedCssFrontend,
       'editor.css': editorStyleFile,
-      'scripts.js': scriptFile,
+      'scripts.js': finalScriptsFile,
       'index.php': indexFile,
       'block.js': blockFile,
+      'remote-loader.js': remoteLoaderFile,
     }
 
   };
@@ -571,11 +876,20 @@ const block = async (
   const loadHtml = async (options) => {
     const { basePath, htmlContent } = options;
     if (htmlContent) {
-      const newHtml = await extractAssets(htmlContent, {
-        basePath,
-        saveFile: true,
-        verbose: false,
-      });
+      const extracted = await extractAssets(
+        htmlContent,
+        buildAssetExtractionOptions(basePath, {
+          uploadToR2: useR2Storage,
+          returnDetails: useR2Storage,
+          jobId,
+          r2Prefix: `generated/${jobId}/assets`,
+        })
+      );
+      const newHtml = typeof extracted === 'string' ? extracted : extracted.html;
+
+      if (typeof extracted !== 'string' && Array.isArray(extracted.assets)) {
+        extractedAssets.push(...extracted.assets);
+      }
 
       return cheerio.load(newHtml, {
         xmlMode: true,
@@ -639,7 +953,7 @@ const block = async (
   };
   const setImageAttribute = (properties) => {
     const { imgTag, imgSrc, imgAlt, attribute, type, prefix } = properties;
-    const newPrefix = prefix ? replaceUnderscoresSpacesAndUppercaseLetters(prefix) : 'wp';
+    const newPrefix = replaceUnderscoresSpacesAndUppercaseLetters(prefix);
     const randomVariable = generateRandomVariableName(`${type}${newPrefix}`);
 
     let imgSrcWithoutOrigin = imgSrc;
@@ -885,10 +1199,12 @@ const block = async (
 
     content = `<div className="custom-block">${content}</div>`;
 
-    return await processEditImages({
+    const processedImages = await processEditImages({
       ...options,
       htmlContent: parseContent(content),
     });
+
+    return replaceSVGImages(processedImages);
   };
 
   const createPanel = (values) => {
@@ -929,8 +1245,6 @@ const block = async (
         });
         // Replace with JSX template, preserving parent context
         result += getSvgTemplate(svgBlock, group1, '</svg>', randomSVGVariable);
-      } else {
-        result += svgBlock;
       }
       lastIndex = end;
     }
@@ -938,8 +1252,7 @@ const block = async (
     return result;
   };
   const getSvgPanelTemplate = (panel) => {
-    return panel.attributes && attributes[panel.attributes]
-      ? `
+    return `
     { (            
     <PanelBody title="${panel.title}">
       <PanelRow>
@@ -957,7 +1270,6 @@ const block = async (
     </PanelBody>
     )}
   `
-      : '';
   };
 
   const getMediaPanelTemplate = (panel) => {
@@ -967,10 +1279,7 @@ const block = async (
                    ${panel.attributes[1]}: media.alt`
         : '';
 
-    return panel.attributes &&
-      panel.attributes[0] &&
-      attributes[panel.attributes[0]]
-      ? `              
+    return `              
       <PanelBody title="${panel.title}">
         <PanelRow>
           <div>
@@ -989,8 +1298,7 @@ const block = async (
           </div>
         </PanelRow>
       </PanelBody>
-      `
-      : '';
+      `;
   };
 
   const getFormSettingsPanelTemplate = (panel) => {
@@ -1083,7 +1391,7 @@ const block = async (
       formIdAttr,
     ] = panel.attributes;
 
-    emailTemplate += sendEmailAttr ? getEmailSaveTemplate(formIdAttr) : '';
+    emailTemplate += getEmailSaveTemplate(formIdAttr);
     phpEmailData += getPhpEmailData(formIdAttr, fromAttr, toAttr, subjectAttr, messageAttr);
   
     return `
@@ -1280,32 +1588,9 @@ const block = async (
   };
 
   const buildSaveContent = (editContent) => {
-    // Ensure RichText and RichText.Content are always self-closing
-    let output = editContent.replace(
-      /<RichText((.|\n)*?)value=\{(.*?)\}((.|\n)*?)>([\s\S]*?)<\/RichText>/gi,
-      '<RichText.Content value={$3} />'
-    );
-    output = output.replace(
-      /<RichText((.|\n)*?)value=\{(.*?)\}((.|\n)*?)\/>/gi,
-      '<RichText.Content value={$3} />'
-    );
-
-    // If a wrapper (e.g., span) contains only RichText.Content, keep the wrapper and its attributes
-    output = output.replace(
-      /(<([a-zA-Z0-9]+)([^>]*)>\s*)<RichText\.Content value=\{([^}]+)\} \/>(\s*<\/\2>)/gi,
-      (match, openTag, tagName, attrs, value, closeTag) => {
-        // Keep the wrapper and its attributes, insert RichText.Content inside
-        return `${openTag}<RichText.Content value={${value}} />${closeTag}`;
-      }
-    );
-
+    let output = replaceRichTextComponents(editContent);
     output = output.replaceAll('class=', 'className=');
-    output = output.replace(
-      /<MediaUpload\b[^>]*>([\s\S]*?(<img\b[^>]*>*\/>)[\s\S]*?)\/>/g,
-      (_match, _attributes, img) => {
-        return img.replace(/onClick={[^}]+}\s*/, '');
-      }
-    );
+    output = replaceMediaUploadComponents(output, images);
     return output;
   };
 
@@ -1329,45 +1614,16 @@ const block = async (
         )
       : undefined;
 
-    htmlContent = unwrapAnchor(htmlContent);  
-
     return {
       ...options,
       htmlContent,
     };
   };
 
-  const unwrapAnchor = (htmlContent) => {
-    return htmlContent.replace(
-      /<span([^>]*)>\s*<a([^>]*)>(.*?)<\/a>\s*<\/span>/gi,
-      (_, spanAttrs, anchorAttrs, content) => {
-        const allAttrs = {};
-        const attrRegex = /(\S+)=["'](.*?)["']/g;
-
-        let match;
-        while ((match = attrRegex.exec(spanAttrs)) !== null) {
-          allAttrs[match[1]] = match[2];
-        }
-
-        while ((match = attrRegex.exec(anchorAttrs)) !== null) {
-          allAttrs[match[1]] = match[2];
-        }
-
-        return `<a ${Object.entries(allAttrs)
-          .map(([key, value]) => `${key}="${value}"`)
-          .join(' ')}>${content}</a>`;
-      }
-    );
-  };
-
   const getComponentAttributes = () => {
     return Object.entries(attributes)
     .map(([key, value]) => {
-      if (typeof value === 'object' && value !== null) {
-        return `${key}: { ${Object.entries(value).map(([k, v]) => `${k}: \`${v}\``).join(', ')} }`;
-      } else {
-        return `${key}:\`${value}\``;
-      }
+      return `${key}: { ${Object.entries(value).map(([k, v]) => `${k}: \`${v}\``).join(', ')} }`;
     })
     .join(',\n');
   };
@@ -1376,11 +1632,14 @@ const block = async (
     let { htmlContent } = options;
 
     if (htmlContent) {
+      profiler.start('getEdit');
       options.htmlContent = unwrapBody(htmlContent);            
       const postProcessLinks = processLinks(options);
       const postGetEditJsx = await getEditJsxContent(postProcessLinks);
       const preConvert = await postGetEditJsx.replace(/<\/br>/g, '<br/>').replace(/<\/hr>/g, '<hr/>')
-      return convert(preConvert)
+      const converted = convert(preConvert);
+      profiler.end('getEdit');
+      return converted;
     }
 
     return '';
@@ -1399,13 +1658,54 @@ const block = async (
     } = settings;
 
     const iconPreview = generateIconPreview ? `(<img src={vars.url + 'preview.jpeg'} />)` : "'shield'";
+    const categoryRegistration = registerCategoryIfMissing
+      ? `
+        (function ensureBlockCategory() {
+          if (
+            typeof wp === 'undefined' ||
+            !wp.blocks ||
+            !wp.blocks.setCategories ||
+            !wp.blocks.store ||
+            !wp.data ||
+            !wp.data.select
+          ) {
+            return;
+          }
+
+          const categorySelector = wp.data.select(wp.blocks.store);
+          const existingCategories =
+            categorySelector && typeof categorySelector.getCategories === 'function'
+              ? categorySelector.getCategories()
+              : [];
+
+          if (existingCategories.some((item) => item && item.slug === ${JSON.stringify(category)})) {
+            return;
+          }
+
+          wp.blocks.setCategories([
+            ...existingCategories,
+            {
+              slug: ${JSON.stringify(category)},
+              title: ${JSON.stringify(formatCategoryLabel(category) || category)},
+            },
+          ]);
+        })();
+      `
+      : '';
+    profiler.start('getBlock:getEdit');
     const edit = await getEdit(settings);    
+    profiler.end('getBlock:getEdit');
+    profiler.start('getBlock:buildSaveContent');
     const save = buildSaveContent(edit);
+    profiler.end('getBlock:buildSaveContent');
+    profiler.start('getBlock:createPanels');
     const blockPanels = createPanels(); 
+    profiler.end('getBlock:createPanels');
 
     const output = `
     (function () {
         ${imports}
+        ${categoryRegistration}
 
         registerBlockType('${blockName}', {
             title: '${name}',
@@ -1441,7 +1741,7 @@ const block = async (
   const setupVariables = async (htmlContent, options) => {
  
   const styleRegex = /<style[^>]*>([\s\S]*?)<\/style>/gi;
-  const linkRegex = /<link\b[^>]*((\brel=["']stylesheet["'])|\bhref=["'][^"']+\.css["'])[^>]*>/gi;
+  const linkRegex = /<link\b[^>]*rel=["']stylesheet["'][^>]*href=["']([^"']+\.css(?:\?[^"']*)?)["'][^>]*>/gi;
 
     let match;
 
@@ -1454,7 +1754,13 @@ const block = async (
     while ((match = linkRegex.exec(htmlContent)) !== null) {
       const url = match[1];
       const fetchCssPromise = fetch(url)
-        .then((response) => response.text())
+        .then((response) => {
+          if (!response.ok) {
+            throw new Error(`HTTP error! Status: ${response.status}`);
+          }
+
+          return response.text();
+        })
         .then((css) => styles.push({ type: 'external', content: css }))
         .catch(() => console.warn(`Failed to fetch: ${url}`));
       fetchCssPromises.push(fetchCssPromise);
@@ -1468,11 +1774,30 @@ const block = async (
       return `${style.content}`;
     }).join('\n');
 
-    const scriptRegex = /<script[^>]*>([\s\S]*?)<\/script>/gi;
+    const scriptRegex = /<script(?![^>]*\bsrc=)[^>]*>([\s\S]*?)<\/script>/gi;
     const scriptSrcRegex =
       /<script\s+[^>]*src=["']([^"']+)["'][^>]*>\s*<\/script>/gi;
 
     let jsMatch;
+
+    const fetchJsPromises = [];
+
+    while ((jsMatch = scriptSrcRegex.exec(htmlContent)) !== null) {
+      const url = jsMatch[1];
+      const fetchJsPromise = fetch(url)
+        .then((response) => {
+          if (!response.ok) {
+            throw new Error(`HTTP error! Status: ${response.status}`);
+          }
+
+          return response.text();
+        })
+        .then((js) => scripts.push({ type: 'external', content: js }))
+        .catch(() => console.warn(`Failed to fetch script: ${url}`));
+      fetchJsPromises.push(fetchJsPromise);
+    }
+
+    htmlContent = htmlContent.replace(scriptSrcRegex, '');
 
     htmlContent = htmlContent.replace(scriptRegex, (_fullMatch, jsContent) => {
       if (jsContent.trim()) {
@@ -1480,19 +1805,6 @@ const block = async (
       }
       return '';
     });
-
-    const fetchJsPromises = [];
-
-    while ((jsMatch = scriptSrcRegex.exec(htmlContent)) !== null) {
-      const url = jsMatch[1];
-      const fetchJsPromise = fetch(url)
-        .then((response) => response.text())
-        .then((js) => scripts.push({ type: 'external', content: js }))
-        .catch(() => console.warn(`Failed to fetch script: ${url}`));
-      fetchJsPromises.push(fetchJsPromise);
-    }
-
-    htmlContent = htmlContent.replace(scriptSrcRegex, '');
 
     await Promise.all(fetchJsPromises);
 
@@ -1503,9 +1815,10 @@ const block = async (
       cssFiles = [],
       jsFiles = [],
       name = 'My block',
+      slug = replaceUnderscoresSpacesAndUppercaseLetters(name),
     } = options;
 
-    const newDir = path.join(basePath, replaceUnderscoresSpacesAndUppercaseLetters(name));
+    const newDir = path.join(basePath, slug);
 
     const $ = cheerio.load(htmlContent, {
       xmlMode: true,
@@ -1516,22 +1829,17 @@ const block = async (
     
     htmlContent = $('body').html();
 
-    options.html
-    
-
-    try {
+    if (outputMode === 'legacy' && options.shouldSaveFiles) {
       fs.mkdirSync(newDir, { recursive: true });
-
-      return {
-        ...options,
-        jsFiles,
-        cssFiles,
-        htmlContent,
-        basePath: newDir,
-      };
-    } catch (error) {
-      logError(error);
     }
+
+    return {
+      ...options,
+      jsFiles,
+      cssFiles,
+      htmlContent,
+      basePath: newDir,
+    };
   };
 
   if (source) {
@@ -1542,14 +1850,14 @@ const block = async (
 
 
   // Screenshot generation using SnapAPI
-  dotenv.config();
+  dotenv.config({ quiet: true });
   if (options.generateIconPreview && options.source) {
     try {
       const snapApiKey = process.env.SNAPAPI_KEY;
       if (!snapApiKey) {
         throw new Error('SNAPAPI_KEY is not set in environment variables.');
       }
-      const snapApiUrl = 'https://api.snapapi.pics/v1/screenshot';
+      const snapApiUrl = getSnapApiUrl();
       const snapApiBody = {
         url: options.source,
         fullPage: true,
@@ -1568,15 +1876,53 @@ const block = async (
       if (!response.ok) {
         throw new Error(`SnapAPI error: ${response.status}`);
       }
-      const previewPath = path.join(options.basePath, replaceUnderscoresSpacesAndUppercaseLetters(options.name), 'preview.jpeg');
       const buffer = Buffer.from(await response.arrayBuffer());
-      fs.writeFileSync(previewPath, buffer);
+
+      if (outputMode === 'legacy' && options.shouldSaveFiles) {
+        const previewPath = path.join(options.basePath, options.slug, 'preview.jpeg');
+        fs.writeFileSync(previewPath, buffer);
+      } else if (useR2Storage) {
+        const uploadResult = await uploadBufferToR2({
+          storageKey: `generated/${jobId}/preview.jpeg`,
+          body: buffer,
+          contentType: 'image/jpeg',
+        });
+
+        previewArtifact = {
+          buffer,
+          file: createFileRecord({
+            id: `file_preview`,
+            name: 'preview.jpeg',
+            kind: 'asset',
+            storageKey: uploadResult.storageKey,
+            size: uploadResult.size,
+            type: uploadResult.type,
+            url: uploadResult.url,
+          }),
+        };
+      }
     } catch (error) {
       console.log(`There was an error generating preview with SnapAPI. ${error.message}`);
     }
   }
 
-  return saveFiles(await setupVariables(htmlContent, options));
+  profiler.start('setupVariables');
+  const preparedOptions = await setupVariables(htmlContent, options);
+  profiler.end('setupVariables');
+  profiler.start('saveFiles');
+  const result = await saveFiles(preparedOptions);
+  profiler.end('saveFiles');
+
+  if (outputMode === 'legacy') {
+    return result;
+  }
+
+  return uploadJobPackage({
+    jobId,
+    generatedFiles: result,
+    assetFiles: extractedAssets,
+    previewArtifact,
+  });
 };
 
 export default block;

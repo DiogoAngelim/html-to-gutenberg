@@ -36,33 +36,45 @@ import {
 
 const { version } = pkg;
 
+export type BlockOptions = {
+  title: string;
+  slug?: string;
+  baseUrl?: string | null;
+  namespace?: string;
+  category?: string;
+  registerCategoryIfMissing?: boolean;
+  outputPath?: string;
+  writeFiles?: boolean;
+  generatePreviewImage?: boolean;
+  jsFiles?: string[];
+  cssFiles?: string[];
+  outputMode?: 'job' | 'legacy';
+  uploadToR2?: boolean;
+  jobId?: string;
+  name?: string;
+  prefix?: string;
+  source?: string | null;
+  basePath?: string;
+  shouldSaveFiles?: boolean;
+  generateIconPreview?: boolean;
+};
+
 const block = async (
   htmlContent: string,
-  options: {
-    name?: string;
-    prefix?: string;
-    category?: string;
-    basePath?: string;
-    shouldSaveFiles?: boolean;
-    generateIconPreview?: boolean;
-    jsFiles?: string[];
-    cssFiles?: string[];
-    source?: string | null;
-  } = {
-      name: 'My block',
-      prefix: 'wp',
-      category: 'common',
-      basePath: process.cwd(),
-      shouldSaveFiles: true,
-      generateIconPreview: false,
-      jsFiles: [],
-      cssFiles: [],
-      source: null,
-    }
+  options: BlockOptions = {
+    title: 'My block',
+    namespace: 'wp',
+    category: 'common',
+    outputPath: process.cwd(),
+    writeFiles: false,
+    generatePreviewImage: false,
+    jsFiles: [],
+    cssFiles: [],
+    baseUrl: null,
+  }
 ) => {
   // ...existing block implementation from index.js...
 };
 
 export default block;
-
 

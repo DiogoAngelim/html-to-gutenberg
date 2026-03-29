@@ -1,136 +1,170 @@
 # HTML to Gutenberg Converter
 
-<!-- [![Build Status](https://github.com/DiogoAngelim/html-to-gutenberg/actions/workflows/main.yml/badge.svg?cacheBust=1)](https://github.com/DiogoAngelim/html-to-gutenberg/actions)
-[![Coverage Status](https://coveralls.io/repos/github/DiogoAngelim/html-to-gutenberg/badge.svg?branch=main&cacheBust=1)](https://coveralls.io/github/DiogoAngelim/html-to-gutenberg?branch=main) -->
 [![MIT License](https://img.shields.io/badge/license-MIT-blue.svg)](https://github.com/DiogoAngelim/html-to-gutenberg/blob/main/LICENSE.MD)
 
-  
+Convert HTML into editable WordPress Gutenberg blocks and publish the generated package to Cloudflare R2 without writing the output to disk.
 
-Convert HTML strings to valid, editable WordPress Gutenberg blocks in seconds instead of hours. With this lib, you can create and build valid Gutenberg blocks that feature editable text, forms, inline and background images, as well as SVGs.
+## What changed
 
-
-## Features
-
-  
-
-- 🪄 **Instantly transforms static HTML into Gutenberg blocks**
-Saves hours of manual work by automating block creation from any valid HTML snippet.
-
-- 🔌 **Generates a complete, installable WordPress block plugin**
-Outputs all necessary plugin files (JS, CSS, PHP) so you can drop them into WordPress immediately.
-  
-
-- 🎨 **Keeps your design intact**
-Automatically extracts and preserves CSS from the original HTML into a separate `style.css`.
-
-
-- 🧩 **Modular and scalable**
-Separates assets (JS, CSS, components) into clean files, making it easy to maintain and extend.
-  
-
-- 📦 **Seamlessly integrates with dynamic block systems**
-Works perfectly for headless or custom Gutenberg setups where blocks are registered via JS, not PHP.
-  
-
-- 🚀 **Speeds up prototyping**
-Ideal for quickly testing block ideas or converting landing pages and templates into WordPress blocks.
-
-  
-- 🧠 **Works with your file system or plugin builder logic**
-Since it returns all files as either strings or source files, you can save them however you like (via PHP, APIs, etc.).
-
-
-- 🧰 **Built for automation and customization**
-Can be embedded in custom tools, UIs, or pipelines to generate Gutenberg blocks on demand.
-
-## How it works
-
-This package is actually an alternative when AI fails converting it, which is usually very common.
-
-Most of the logic is just hard-coded patterns. It first converts from plain HTML to Jsx (using the `html-to-jsx` package), which is the supported format of Gutenberg. Then, it follows structured conversion rules that build the WordPress block, which is then validated and parsed using Babel.
-
-
-## The Building Process - An Overview
-
-
-Below is a visual overview of the block generation process:
-
-![Block Generation Process](process.png)  
-
+- `html-to-gutenberg` now supports a `job` output mode that uploads generated files to R2 and returns a JSON manifest.
+- `fetch-page-assets` can upload downloaded assets directly to R2 and return their metadata.
+- Output bundles are zipped in memory and uploaded to R2 as `output.zip`.
+- Secrets stay in `.env` and should never be committed.
 
 ## Installation
 
-  
-Install html-to-gutenberg with npm:
-
 ```bash
-
-npm  install  html-to-gutenberg
-
+npm install html-to-gutenberg
 ```
 
-  
+## Environment
 
-## Usage/Examples
+Copy `.env.example` to `.env` and keep the real values private.
 
-  
+```bash
+cp .env.example .env
+```
 
-```javascript
+Required for R2-backed job output:
 
-// block-generator.js
+- `CLOUDFLARE_R2_ACCOUNT_ID`
+- `CLOUDFLARE_R2_BUCKET`
+- `CLOUDFLARE_R2_ACCESS_KEY_ID`
+- `CLOUDFLARE_R2_SECRET_ACCESS_KEY`
+- `CLOUDFLARE_R2_PUBLIC_BASE_URL`
 
-import  block  from  'html-to-gutenberg';
+Optional:
 
-const  htmlString = '<div>My content</div>';
+- `CLOUDFLARE_API_TOKEN`
+- `SNAPAPI_KEY`
 
+## Getting and rotating Cloudflare credentials
+
+1. Open the Cloudflare dashboard.
+2. Create or update your R2 access keys for the target bucket.
+3. Store the new values in `.env`.
+4. If you use a Cloudflare API token for verification or account workflows, create a new token in the API Tokens section and update `.env`.
+5. Restart your app or redeploy after updating `.env`.
+6. Revoke the old token or key after the new one is live.
+
+To verify a Cloudflare API token without exposing it in code, use an environment variable:
+
+```bash
+curl "https://api.cloudflare.com/client/v4/user/tokens/verify" \
+  -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN"
+```
+
+## Usage
+
+```js
+import block from 'html-to-gutenberg';
+
+const result = await block('<div>Hello world</div>', {
+  title: 'Marketing Hero',
+  slug: 'marketing-hero',
+  namespace: 'wp',
+  baseUrl: 'https://example.com',
+  outputMode: 'job',
+  uploadToR2: true,
+  jobId: 'conv_123'
+});
+
+console.log(result);
+```
+
+Example response:
+
+```json
 {
-	const files = await  block(htmlString, { name:  'My Block' });
-	console.log(files);
+  "jobId": "conv_123",
+  "status": "completed",
+  "output": {
+    "files": [
+      {
+        "id": "file_1",
+        "name": "block.js",
+        "type": "text/javascript",
+        "size": 18234,
+        "path": "/generated/conv_123/block.js",
+        "url": "https://storage.example.com/generated/conv_123/block.js",
+        "kind": "source"
+      },
+      {
+        "id": "file_2",
+        "name": "asset.png",
+        "type": "image/png",
+        "size": 48211,
+        "path": "/generated/conv_123/assets/asset.png",
+        "url": "https://storage.example.com/generated/conv_123/assets/asset.png",
+        "kind": "asset"
+      }
+    ],
+    "bundle": {
+      "name": "output.zip",
+      "path": "/generated/conv_123/output.zip",
+      "url": "https://storage.example.com/generated/conv_123/output.zip",
+      "zipUrl": "https://storage.example.com/generated/conv_123/output.zip"
+    }
+  }
 }
-
 ```
 
-  
+## Legacy mode
 
+If you still need the previous local-string output for existing tooling or tests, use:
 
-When provided with a valid HTML string with the desired options, the block function will generate the necessary WordPress block files with the specified configuration. To install the block and its assets, simply load the generated folder into the plugins folder and activate it as a plugin.
-  
+```js
+const files = await block('<div>Hello world</div>', {
+  title: 'Legacy Block',
+  outputPath: process.cwd(),
+  writeFiles: false,
+  outputMode: 'legacy'
+});
+```
 
-## Options reference
+In `legacy` mode, the function returns the generated file contents instead of the R2 job manifest.
 
+## Options
 
-| Option              | Description                                                                                                                                           | Type     | Required?                                                                                          | Default            |
-|---------------------|-------------------------------------------------------------------------------------------------------------------------------------------------------|----------|-----------------------------------------------------------------------------------------------------|-------------------|
-| name                | The name of your block. This will also be used for the folder name and internal references.                                                          | string   | Yes                                                                                                 | My block          |
-| source              | A URL where relative paths resolve. E.g., `http://localhost/website`.                                                                     | string   | Yes, only if the HTML string or the stylesheet has relative paths.                             | null              |
-| prefix              | A namespace prefix for the block name, typically aligned with your project (e.g., "wp" or "myplugins").                                              | string   | No                                                                                                  | wp                |
-| category            | The WordPress block category where the block appears in the editor. Use an existing one or register a custom category if needed.                    | string   | No                                                                                                  | common            |
-| basePath            | The absolute path where the output files and folders will be saved.                                                                                  | string   | No                                                                                                  | Current directory |
-| generateIconPreview | If you enable the `generateIconPreview` option by setting it to `true`, this package will generate a static image preview of your block using the [SnapAPI](https://snapapi.pics/) screenshot service. You must provide a SnapAPI key in a `.env` file (see below), which will display it a replacement for the block icons in the WP dashboard. | boolean  | No                                                                                                  | false             |
-| shouldSaveFiles     | When `true`, the generated block files are saved directly to disk. When `false`, returns an object containing the file contents as strings instead. | boolean  | No                                                                                                  | true              |
-| jsFiles             | An array of external JavaScript file URLs to enqueue with the block on the editor and the frontend. Useful for adding remote libraries.             | string[] | No                                                                                                  | []                |
-| cssFiles            | An array of external CSS file URLs to enqueue with the block on the editor and the frontend. Useful for adding additional remote stylesheets.        | string[] | No                                                                                                  | []                |
+| Option | Description | Type | Default |
+| --- | --- | --- | --- |
+| `title` | Human-readable block title shown in the editor. | `string` | `My block` |
+| `slug` | Filesystem-safe internal block name. Defaults to a slugified title. | `string` | slugified `title` |
+| `baseUrl` | Base URL used to resolve relative asset paths in HTML and CSS. | `string \| null` | `null` |
+| `namespace` | Gutenberg block namespace. | `string` | `wp` |
+| `category` | Gutenberg block category. | `string` | `common` |
+| `registerCategoryIfMissing` | Adds a custom editor category before block registration when needed. | `boolean` | `false` |
+| `outputPath` | Absolute directory used for local legacy output. In `job` mode it is only a logical working base. | `string` | current directory |
+| `writeFiles` | Writes local files in `legacy` mode. When `false`, returns generated files in memory. | `boolean` | `false` in the streamlined API |
+| `generatePreviewImage` | Generates and uploads `preview.jpeg` using SnapAPI. | `boolean` | `false` |
+| `jsFiles` | Remote JS dependencies to enqueue. | `string[]` | `[]` |
+| `cssFiles` | Remote CSS dependencies to enqueue. | `string[]` | `[]` |
+| `outputMode` | Advanced option. `job` uploads to R2 and returns JSON. `legacy` returns raw file contents. | `'job' \| 'legacy'` | `job`, unless local-output options imply `legacy` |
+| `uploadToR2` | Advanced option to force or disable R2 uploads. | `boolean` | `true` in `job` mode |
+| `jobId` | Advanced stable conversion identifier. | `string` | autogenerated |
 
+Legacy aliases still work for backwards compatibility:
 
+- `name` -> `title`
+- `prefix` -> `namespace`
+- `source` -> `baseUrl`
+- `basePath` -> `outputPath`
+- `shouldSaveFiles` -> `writeFiles`
+- `generateIconPreview` -> `generatePreviewImage`
 
-**Special thanks to [Alex Serebryakov](https://snapapi.pics/) for creating and maintaining SnapAPI!**
+## Notes
 
+- Generated output is zipped in memory before upload.
+- R2 uploads use the values from `.env`.
+- Do not hardcode real tokens or keys in source code, docs, or tests.
 
-## Running Tests
-
-To run the test suite, use:
+## Running tests
 
 ```bash
-cd html-to-gutenberg && npm install
+npm install
 npm test
 ```
 
-This will execute all unit and integration tests using Mocha and Chai. Make sure all dependencies are installed with `npm install` before running tests.
-
-Some tests (such as screenshot preview generation) may require a valid SnapAPI key in your `.env` file.
-
-
 ## License
-  
 
 [MIT](https://github.com/DiogoAngelim/html-to-gutenberg/blob/main/LICENSE.MD)

@@ -1,0 +1,70 @@
+name: Sync NPM Package
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: Specific npm version to sync. Leave empty to use the dist-tag.
+        required: false
+        type: string
+      dist_tag:
+        description: npm dist-tag to sync when no version is provided.
+        required: false
+        default: latest
+        type: string
+  schedule:
+    - cron: '0 9 * * *'
+
+permissions:
+  contents: write
+
+concurrency:
+  group: sync-npm
+  cancel-in-progress: false
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Sync repository from npm
+        env:
+          NPM_SYNC_VERSION: ${{ inputs.version }}
+          NPM_SYNC_DIST_TAG: ${{ inputs.dist_tag }}
+          NPM_SYNC_PRESERVE_PATHS: .git,.github,node_modules,.env,scripts
+        run: node ./scripts/sync-from-npm.mjs
+
+      - name: Detect changes
+        id: changes
+        run: |
+          if git diff --quiet; then
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Read synced version
+        if: steps.changes.outputs.changed == 'true'
+        id: version
+        run: echo "value=$(node -p \"require('./package.json').version\")" >> "$GITHUB_OUTPUT"
+
+      - name: Commit changes
+        if: steps.changes.outputs.changed == 'true'
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -m "chore: sync npm package v${{ steps.version.outputs.value }}"
+
+      - name: Push changes
+        if: steps.changes.outputs.changed == 'true'
+        run: git push
